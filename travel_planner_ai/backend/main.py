@@ -1,7 +1,7 @@
 # backend/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import router as trip_router
+from travel_planner_ai.backend.routes import router as trip_router
 
 app = FastAPI(title="Travel Planner AI")
 
@@ -17,7 +17,7 @@ app.add_middleware(
 app.include_router(trip_router, prefix="/api")
 
 @app.get("/")
-def read_root():
+async def root():
     return {"message": "Welcome to the Travel Planner AI API"}
 
 # Run with: uvicorn main:app --reload

@@ -3,7 +3,7 @@ import os
 import openai
 from functools import wraps
 from cachetools import TTLCache, cached
-from models import TripRequest
+from travel_planner_ai.backend.models import TripRequest
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from a .env file

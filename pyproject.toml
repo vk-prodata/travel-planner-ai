@@ -3,18 +3,22 @@ name = "travel-planner-ai"
 version = "0.1.0"
 description = "Travel Planner AI using FastAPI, GPT-4o, and React"
 authors = ["Vitalii Kudriavtcev <vkusa87@gmail.com>"]
-python = "^3.12"
+packages = [
+    { include = "travel_planner_ai" }
+]
+
 
 [tool.poetry.dependencies]
-fastapi = "^0.95.0"
-uvicorn = "^0.22.0"
-motor = "^3.0.1"
-pydantic = "^1.10.7"
+python = "^3.11.0"
+fastapi = "^0.109.0"
+uvicorn = "^0.27.0"
+motor = "^3.3.2"
+pydantic = "^2.6.1"
 python-dotenv = "^1.0.0"
-openai = "^0.27.0"
-cachetools = "^5.3.0"
+openai = "^1.12.0"
+cachetools = "^5.3.2"
 
-[tool.poetry.dev-dependencies]
+[poetry.group.dev.dependencies]
 pytest = "^7.2.0"
 
 [build-system]

@@ -1,8 +1,8 @@
 # backend/routes.py
 from fastapi import APIRouter, HTTPException
-from models import TripRequest, TripItinerary
-from trip_planner import generate_itinerary
-from db import save_trip, get_trip
+from travel_planner_ai.backend.models import TripRequest, TripItinerary
+from travel_planner_ai.backend.trip_planner import generate_itinerary
+from travel_planner_ai.backend.db import save_trip, get_trip
 
 router = APIRouter()
 
