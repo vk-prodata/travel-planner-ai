@@ -209,7 +209,7 @@ const App = () => {
             ) : itinerary ? (
               <div>
                 <h3 className="text-primary-dark mb-4">
-                  Trip to {itinerary.days[0].activities[0].description.split('→')[1]?.trim() || 'Your Destination'}
+                  Trip to {formData?.destination || 'Your Destination'}
                 </h3>
                 <Itinerary 
                   itinerary={itinerary}

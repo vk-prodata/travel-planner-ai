@@ -251,7 +251,16 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       <Form.Group className="mb-3">
         <Form.Label>Entertainment Preferences</Form.Label>
         <div className="d-flex flex-wrap gap-2">
-          {['outdoor', 'cultural', 'relaxation', 'family-friendly', 'food'].map((pref) => (
+          {[
+            'outdoor',
+            'cultural',
+            'relaxation',
+            'family-friendly',
+            'food',
+            'adventure',
+            'educational',
+            'nightlife'
+          ].map((pref) => (
             <Button
               key={pref}
               variant={formData.entertainmentPreferences.includes(pref as EntertainmentPreference) ? 'primary' : 'outline-primary'}

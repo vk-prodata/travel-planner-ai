@@ -1,6 +1,14 @@
 export type TravelType = 'road' | 'flight' | 'train' | 'cruise';
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';
-export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food';
+export type EntertainmentPreference = 
+  | 'outdoor' 
+  | 'cultural' 
+  | 'relaxation' 
+  | 'family-friendly' 
+  | 'food'
+  | 'adventure'      // For thrill-seeking activities
+  | 'educational'    // For museums, workshops, etc.
+  | 'nightlife';     // For evening entertainment
 
 export interface Stop {
   destination: string;

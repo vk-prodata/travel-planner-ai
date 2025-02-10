@@ -1,12 +1,12 @@
 import * as React from 'react';
-import { Card, Button, Row, Col } from 'react-bootstrap';
-import { TripItinerary } from '../types';
-import { BsArrowRepeat } from 'react-icons/bs';
+import { Card, Button } from 'react-bootstrap';
+import { TripItinerary, Activity } from '../types';
+import { BsArrowRepeat, BsCheck, BsX } from 'react-icons/bs';
 import { useState } from 'react';
 
 interface ItineraryProps {
   itinerary: TripItinerary;
-  onActivityUpdate: (dayIndex: number, activityIndex: number, updatedActivity: any) => void;
+  onActivityUpdate: (dayIndex: number, activityIndex: number, updatedActivity: Activity) => void;
   onSuggestAlternative: (dayIndex: number, activityIndex: number) => void;
   alternatives: {
     [key: string]: string[];
@@ -15,6 +15,13 @@ interface ItineraryProps {
 
 const Itinerary: React.FC<ItineraryProps> = ({ itinerary, alternatives }) => {
   const [altSuggestions, setAltSuggestions] = useState<{[key: string]: string}>({});
+  const [activities, setActivities] = useState<{[key: string]: Activity}>(
+    Object.fromEntries(
+      itinerary.days.flatMap(day => 
+        day.activities.map(activity => [activity.id, activity])
+      )
+    )
+  );
 
   const handleSuggestAlternative = (activityId: string, type: string) => {
     const mockAlts = alternatives[type] || [];
@@ -23,6 +30,33 @@ const Itinerary: React.FC<ItineraryProps> = ({ itinerary, alternatives }) => {
       ...prev,
       [activityId]: randomAlt
     }));
+  };
+
+  const handleApplyAlternative = (activityId: string) => {
+    const alternative = altSuggestions[activityId];
+    if (alternative) {
+      setActivities(prev => ({
+        ...prev,
+        [activityId]: {
+          ...prev[activityId],
+          description: alternative
+        }
+      }));
+      // Remove the alternative after applying
+      setAltSuggestions(prev => {
+        const newState = { ...prev };
+        delete newState[activityId];
+        return newState;
+      });
+    }
+  };
+
+  const handleCancelAlternative = (activityId: string) => {
+    setAltSuggestions(prev => {
+      const newState = { ...prev };
+      delete newState[activityId];
+      return newState;
+    });
   };
 
   return (
@@ -41,8 +75,12 @@ const Itinerary: React.FC<ItineraryProps> = ({ itinerary, alternatives }) => {
                       {activity.time}
                     </strong>
                     <div>
-                      <p className="mb-1 text-secondary">{activity.description}</p>
-                      <span className="badge bg-info-light text-info-dark">{activity.type}</span>
+                      <p className="mb-1 text-secondary">
+                        {activities[activity.id]?.description || activity.description}
+                      </p>
+                      <span className="badge bg-info-light text-info-dark">
+                        {activity.type}
+                      </span>
                     </div>
                   </div>
                   <Button 
@@ -56,9 +94,29 @@ const Itinerary: React.FC<ItineraryProps> = ({ itinerary, alternatives }) => {
                 </div>
                 {altSuggestions[activity.id] && (
                   <div className="mt-2 ms-5 ps-3 border-start border-primary bg-light p-2 rounded">
-                    <p className="mb-0 text-primary-dark">
-                      <strong>Alternative:</strong> {altSuggestions[activity.id]}
-                    </p>
+                    <div className="d-flex justify-content-between align-items-start">
+                      <p className="mb-0 text-primary-dark">
+                        <strong>Alternative:</strong> {altSuggestions[activity.id]}
+                      </p>
+                      <div className="d-flex gap-2">
+                        <Button 
+                          variant="outline-success" 
+                          size="sm" 
+                          className="rounded-circle"
+                          onClick={() => handleApplyAlternative(activity.id)}
+                        >
+                          <BsCheck />
+                        </Button>
+                        <Button 
+                          variant="outline-danger" 
+                          size="sm" 
+                          className="rounded-circle"
+                          onClick={() => handleCancelAlternative(activity.id)}
+                        >
+                          <BsX />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
