@@ -1,10 +1,165 @@
+:root {
+  --primary: #003580;
+  --primary-dark: #00224f;
+  --primary-light: #e6f2ff;
+  --secondary: #006ce4;
+  --info: #0071c2;
+  --info-light: #ebf3ff;
+  --info-dark: #003580;
+  --success: #008009;
+  --warning: #febb02;
+  --danger: #dc3545;
+  --light: #f5f5f5;
+  --dark: #333333;
+  --gray: #6b6b6b;
+}
+
 body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--light);
+  color: var(--dark);
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+.bg-primary-gradient {
+  background: linear-gradient(to right, var(--primary), var(--primary-dark));
+}
+
+.text-primary-dark {
+  color: var(--primary-dark) !important;
+}
+
+.bg-info-light {
+  background-color: var(--info-light) !important;
+}
+
+.text-info-dark {
+  color: var(--info-dark) !important;
+}
+
+.card {
+  border: none;
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+.btn-outline-primary {
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--secondary);
+  border-color: var(--secondary);
+  color: white;
+}
+
+.btn-primary {
+  background-color: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.badge {
+  font-weight: 500;
+  padding: 0.5em 0.8em;
+}
+
+.shadow-sm {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+
+/* Left sidebar styles */
+.border-end {
+  border-color: #e7e7e7 !important;
+  background-color: white;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Form styles */
+.form-control:focus {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 0.2rem rgba(0,108,228,0.25);
+}
+
+.form-select:focus {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 0.2rem rgba(0,108,228,0.25);
+}
+
+/* Add to existing styles */
+
+.sticky-top {
+  top: 0;
+  z-index: 1020;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+  border: 2px solid #e7e7e7;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+}
+
+.form-control:hover, .form-select:hover {
+  border-color: var(--secondary);
+}
+
+/* Badge styles for form elements */
+.badge-travel-type {
+  background-color: var(--info-light);
+  color: var(--info);
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.badge-travel-type:hover {
+  background-color: var(--info);
+  color: white;
+}
+
+/* Card styles */
+.card {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-header {
+  border-bottom: none;
+}
+
+/* Button hover effects */
+.btn {
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Spinner styles */
+.spinner-border {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-width: 0.2em;
 } 

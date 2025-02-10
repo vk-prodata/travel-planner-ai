@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { Form, Button, Container, Row, Col, Badge } from 'react-bootstrap';
-import { TripFormData, TravelType, EntertainmentPreference } from '../types';
+import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { TripFormData, TravelType, EntertainmentPreference, Stop } from '../types';
+import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 
 interface TripFormProps {
   onSubmit: (data: TripFormData) => void;
@@ -18,21 +19,21 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     adults: 1,
     children: 0,
     infants: 0,
-    intermediateStops: [],
+    intermediateStops: [] as Stop[],
     entertainmentPreferences: [],
     budgetLevel: 'mid-range',
     language: 'en'
   });
 
-  const [newStop, setNewStop] = useState('');
+  const [newStop, setNewStop] = useState<Stop>({ destination: '', days: 1 });
 
   const addIntermediateStop = () => {
-    if (newStop) {
+    if (newStop.destination) {
       setFormData({
         ...formData,
         intermediateStops: [...formData.intermediateStops, newStop]
       });
-      setNewStop('');
+      setNewStop({ destination: '', days: 1 });
     }
   };
 
@@ -56,11 +57,12 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
   };
 
   return (
-    <Form onSubmit={handleSubmit} className="p-3">
+    <Form onSubmit={handleSubmit} className="p-2">
       {/* Travel Type */}
-      <Form.Group className="mb-3">
-        <Form.Label>Travel Type</Form.Label>
+      <Form.Group className="mb-2">
+        <Form.Label className="text-secondary fw-bold small">Travel Type</Form.Label>
         <Form.Select
+          className="shadow-sm"
           value={formData.travelType}
           onChange={(e) => setFormData({...formData, travelType: e.target.value as TravelType})}
         >
@@ -72,11 +74,12 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       </Form.Group>
 
       {/* Departure & Destination */}
-      <Row className="mb-3">
+      <Row className="mb-4">
         <Col md={6}>
           <Form.Group>
-            <Form.Label>From</Form.Label>
+            <Form.Label className="text-secondary fw-bold">From</Form.Label>
             <Form.Control
+              className="shadow-sm"
               type="text"
               value={formData.departure}
               onChange={(e) => setFormData({...formData, departure: e.target.value})}
@@ -86,8 +89,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
         </Col>
         <Col md={6}>
           <Form.Group>
-            <Form.Label>To</Form.Label>
+            <Form.Label className="text-secondary fw-bold">To</Form.Label>
             <Form.Control
+              className="shadow-sm"
               type="text"
               value={formData.destination}
               onChange={(e) => setFormData({...formData, destination: e.target.value})}
@@ -127,8 +131,20 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       <Row className="mb-3">
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Adults</Form.Label>
+            <Form.Label className="d-flex align-items-center">
+              Adults
+              <span style={{ cursor: 'help' }}>
+                <OverlayTrigger
+                  placement="top"
+                  trigger={['hover', 'focus']}
+                  overlay={<Tooltip id={`adults-tooltip`}>Age 12 and above</Tooltip>}
+                >
+                  <FaInfoCircle className="ms-2 text-secondary" size={14} />
+                </OverlayTrigger>
+              </span>
+            </Form.Label>
             <Form.Control
+              className="shadow-sm"
               type="number"
               min="1"
               value={formData.adults}
@@ -138,8 +154,20 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
         </Col>
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Children</Form.Label>
+            <Form.Label className="d-flex align-items-center">
+              Children
+              <span style={{ cursor: 'help' }}>
+                <OverlayTrigger
+                  placement="top"
+                  trigger={['hover', 'focus']}
+                  overlay={<Tooltip id={`children-tooltip`}>Age 2-11</Tooltip>}
+                >
+                  <FaInfoCircle className="ms-2 text-secondary" size={14} />
+                </OverlayTrigger>
+              </span>
+            </Form.Label>
             <Form.Control
+              className="shadow-sm"
               type="number"
               min="0"
               value={formData.children}
@@ -149,8 +177,20 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
         </Col>
         <Col md={4}>
           <Form.Group>
-            <Form.Label>Infants</Form.Label>
+            <Form.Label className="d-flex align-items-center">
+              Infants
+              <span style={{ cursor: 'help' }}>
+                <OverlayTrigger
+                  placement="top"
+                  trigger={['hover', 'focus']}
+                  overlay={<Tooltip id={`infants-tooltip`}>Under 2 years</Tooltip>}
+                >
+                  <FaInfoCircle className="ms-2 text-secondary" size={14} />
+                </OverlayTrigger>
+              </span>
+            </Form.Label>
             <Form.Control
+              className="shadow-sm"
               type="number"
               min="0"
               value={formData.infants}
@@ -162,31 +202,46 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
 
       {/* Intermediate Stops */}
       <Form.Group className="mb-3">
-        <Form.Label>Intermediate Stops</Form.Label>
+        <Form.Label className="d-flex align-items-center">
+          Intermediate Stops
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Add locations you want to visit during your trip</Tooltip>}
+          >
+            <FaInfoCircle className="ms-2 text-secondary" size={14} />
+          </OverlayTrigger>
+        </Form.Label>
         <div className="d-flex gap-2 mb-2">
           <Form.Control
             type="text"
-            value={newStop}
-            onChange={(e) => setNewStop(e.target.value)}
-            placeholder="Add a stop"
+            value={newStop.destination}
+            onChange={(e) => setNewStop({ ...newStop, destination: e.target.value })}
+            placeholder="City/Location"
+            className="flex-grow-1 shadow-sm"
           />
-          <Button onClick={addIntermediateStop} variant="outline-secondary">Add</Button>
+          <Form.Control
+            type="number"
+            min="1"
+            value={newStop.days}
+            onChange={(e) => setNewStop({ ...newStop, days: parseInt(e.target.value) })}
+            placeholder="Days"
+            className="shadow-sm"
+            style={{ width: '70px' }}
+          />
+          <Button 
+            onClick={addIntermediateStop} 
+            variant="outline-primary" 
+            className="shadow-sm d-flex align-items-center justify-content-center"
+            style={{ width: '36px', height: '36px', padding: 0 }}
+          >
+            <FaPlus size={12} />
+          </Button>
         </div>
         <div className="d-flex flex-wrap gap-2">
           {formData.intermediateStops.map((stop, index) => (
-            <Badge 
-              key={index} 
-              bg="secondary" 
-              className="d-flex align-items-center p-2"
-            >
-              {stop}
-              <Button 
-                variant="link" 
-                className="p-0 ms-2 text-light" 
-                onClick={() => removeStop(index)}
-              >
-                ×
-              </Button>
+            <Badge key={index} bg="secondary" className="d-flex align-items-center p-2">
+              {stop.destination} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
+              <Button variant="link" className="p-0 ms-2 text-light" onClick={() => removeStop(index)}>×</Button>
             </Badge>
           ))}
         </div>
@@ -229,20 +284,33 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       <Form.Group className="mb-4">
         <Form.Label>Language</Form.Label>
         <Form.Select
+          className="shadow-sm"
           value={formData.language}
           onChange={(e) => setFormData({...formData, language: e.target.value})}
         >
           <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="fr">French</option>
-          <option value="de">German</option>
-          <option value="it">Italian</option>
-          <option value="ru">Russian</option>
+          <option value="es">Spanish (Español)</option>
+          <option value="fr">French (Français)</option>
+          <option value="de">German (Deutsch)</option>
+          <option value="it">Italian (Italiano)</option>
+          <option value="ru">Russian (Русский)</option>
+          <option value="zh">Chinese (中文)</option>
         </Form.Select>
       </Form.Group>
 
-      <Button type="submit" disabled={isLoading} className="w-100">
-        {isLoading ? 'Generating Itinerary...' : 'Plan My Trip'}
+      <Button 
+        type="submit" 
+        disabled={isLoading} 
+        className="w-100 shadow-sm py-2"
+      >
+        {isLoading ? (
+          <>
+            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Generating Itinerary...
+          </>
+        ) : (
+          'Plan My Trip'
+        )}
       </Button>
     </Form>
   );

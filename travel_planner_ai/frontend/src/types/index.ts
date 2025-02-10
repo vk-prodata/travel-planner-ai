@@ -2,6 +2,11 @@ export type TravelType = 'road' | 'flight' | 'train' | 'cruise';
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';
 export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food';
 
+export interface Stop {
+  destination: string;
+  days: number;
+}
+
 export interface TripFormData {
   travelType: TravelType;
   departure: string;
@@ -11,7 +16,7 @@ export interface TripFormData {
   adults: number;
   children: number;
   infants: number;
-  intermediateStops: string[];
+  intermediateStops: Stop[];
   entertainmentPreferences: EntertainmentPreference[];
   budgetLevel: BudgetLevel;
   language: string;
