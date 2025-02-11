@@ -43,4 +43,19 @@ export interface TripItinerary {
     date: string;
     activities: Activity[];
   }[];
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface LoginData {
+  email: string;
+  password: string;
+}
+
+export interface SignupData extends LoginData {
+  name: string;
 } 

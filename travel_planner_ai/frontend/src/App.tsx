@@ -6,6 +6,8 @@ import Itinerary from './components/Itinerary';
 import { TripFormData, TripItinerary } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture } from 'react-icons/fa';
+import { useAuth } from './contexts/AuthContext';
+import AuthForm from './components/AuthForm';
 
 const mockItinerary = {
   tripId: '123',
@@ -137,14 +139,33 @@ const mockAlternatives = {
   ]
 };
 
+const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
+  const initials = name
+    .split(' ')
+    .slice(0, 2) // Take first two words
+    .map(word => word.charAt(0).toUpperCase()) // Get first letter of each word
+    .join(''); // Join them together
+
+  return (
+    <div 
+      className="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary"
+      style={{ 
+        width: '32px', 
+        height: '32px',
+        fontSize: '0.875rem', // Slightly smaller font for two letters
+        fontWeight: '500'
+      }}
+    >
+      {initials}
+    </div>
+  );
+};
+
 const App = () => {
+  const { user, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [formData, setFormData] = useState<TripFormData | null>(null);
-
-  const handleSignIn = () => setIsLoggedIn(true);
-  const handleSignOut = () => setIsLoggedIn(false);
 
   const handleSubmit = async (data: TripFormData) => {
     setIsLoading(true);
@@ -158,45 +179,35 @@ const App = () => {
   return (
     <Container fluid className="p-0">
       <Row className="g-0">
-        {/* Left Section - Filters and Auth */}
         <Col md={4} className="border-end shadow-sm" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
-          <div className="p-3 bg-white">
-            <h2 className="text-primary-dark mb-3 d-flex align-items-center fs-4">
-              <FaPlaneDeparture className="me-2 text-secondary" size={20} />
-              Travel Planner AI
-            </h2>
-            <div className="bg-light p-2 rounded shadow-sm mb-3">
-              <h5 className="text-primary-dark mb-2 fs-6">Plan Your Trip</h5>
+          <div className="p-2">
+            <div className="bg-light p-2 rounded shadow-sm">
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <div className="d-flex align-items-center">
+                  <FaPlaneDeparture className="me-2 text-secondary" size={20} />
+                  <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
+                </div>
+                {!user ? (
+                  <AuthForm />
+                ) : (
+                  <div className="d-flex align-items-center gap-2">
+                    <UserAvatar name={user.name} />
+                    <Button 
+                      variant="outline-danger" 
+                      size="sm" 
+                      onClick={signOut}
+                      className="rounded-pill"
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
+                )}
+              </div>
               <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
-            </div>
-            <div className="mt-3 pt-2 border-top">
-              {!isLoggedIn ? (
-                <div className="d-flex gap-2">
-                  <Button variant="outline-primary" onClick={handleSignIn} className="shadow-sm flex-grow-1" size="sm">
-                    Sign In
-                  </Button>
-                  <Button variant="primary" onClick={handleSignIn} className="shadow-sm flex-grow-1" size="sm">
-                    Sign Up
-                  </Button>
-                </div>
-              ) : (
-                <div className="d-flex align-items-center justify-content-between">
-                  <span className="text-primary-dark">Welcome back!</span>
-                  <Button 
-                    variant="outline-danger" 
-                    size="sm" 
-                    onClick={handleSignOut}
-                    className="shadow-sm"
-                  >
-                    Sign Out
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </Col>
 
-        {/* Right Section - Trip Info */}
         <Col md={8} className="bg-light">
           <div className="p-4">
             {isLoading ? (

@@ -162,4 +162,25 @@ code {
   width: 1.5rem;
   height: 1.5rem;
   border-width: 0.2em;
+}
+
+/* Add to existing styles */
+.google-button {
+  background-color: white;
+  color: #757575;
+  border: 1px solid #ddd;
+}
+
+.google-button:hover {
+  background-color: #f8f9fa;
+  border-color: #ddd;
+  color: #555;
+}
+
+.user-avatar {
+  transition: transform 0.2s;
+}
+
+.user-avatar:hover {
+  transform: scale(1.1);
 } 
