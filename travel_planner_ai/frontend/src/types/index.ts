@@ -17,7 +17,7 @@ export interface Stop {
 
 export interface TripFormData {
   travelType: TravelType;
-  departure: string;
+  origin?: string;
   destination: string;
   startDate: string;
   endDate: string;

@@ -12,7 +12,7 @@ interface TripFormProps {
 const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
   const [formData, setFormData] = useState<TripFormData>({
     travelType: 'flight',
-    departure: '',
+    origin: '',
     destination: '',
     startDate: '',
     endDate: '',
@@ -81,8 +81,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
             <Form.Control
               className="shadow-sm"
               type="text"
-              value={formData.departure}
-              onChange={(e) => setFormData({...formData, departure: e.target.value})}
+              value={formData.origin}
+              onChange={(e) => setFormData({...formData, origin: e.target.value})}
               required
             />
           </Form.Group>

@@ -5,7 +5,8 @@ import TripForm from './components/TripForm';
 import Itinerary from './components/Itinerary';
 import { TripFormData, TripItinerary } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaPlaneDeparture } from 'react-icons/fa';
+import { FaPlaneDeparture, FaEdit, FaSave } from 'react-icons/fa';
+import { IoMdRefresh } from 'react-icons/io';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 
@@ -166,6 +167,8 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
   const [formData, setFormData] = useState<TripFormData | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
 
   const handleSubmit = async (data: TripFormData) => {
     setIsLoading(true);
@@ -174,6 +177,11 @@ const App = () => {
       setItinerary(mockItinerary);
       setIsLoading(false);
     }, 1500);
+  };
+
+  const getTripTitle = () => {
+    if (!formData) return 'Your Trip';
+    return `Trip ${formData.origin ? `from ${formData.origin}` : ''} to ${formData.destination || 'Your Destination'}`;
   };
 
   return (
@@ -219,9 +227,58 @@ const App = () => {
               </div>
             ) : itinerary ? (
               <div>
-                <h3 className="text-primary-dark mb-4">
-                  Trip to {formData?.destination || 'Your Destination'}
-                </h3>
+                <div className="d-flex align-items-center justify-content-between mb-4">
+                  {isEditingTitle ? (
+                    <div className="d-flex align-items-center gap-2">
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editedTitle}
+                        onChange={(e) => setEditedTitle(e.target.value)}
+                        autoFocus
+                      />
+                      <Button 
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => {
+                          // Save logic here
+                          setIsEditingTitle(false);
+                        }}
+                      >
+                        <FaSave size={14} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="d-flex align-items-center gap-2">
+                      <h3 className="text-primary-dark m-0">
+                        {getTripTitle()}
+                      </h3>
+                      <Button 
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-secondary"
+                        onClick={() => {
+                          setEditedTitle(getTripTitle());
+                          setIsEditingTitle(true);
+                        }}
+                      >
+                        <FaEdit size={14} />
+                      </Button>
+                    </div>
+                  )}
+                  <Button 
+                    variant="outline-secondary"
+                    size="sm"
+                    className="rounded-circle d-flex align-items-center justify-content-center"
+                    style={{ width: '32px', height: '32px' }}
+                    onClick={() => {
+                      // Refresh logic here
+                      handleSubmit(formData!);
+                    }}
+                  >
+                    <IoMdRefresh size={16} />
+                  </Button>
+                </div>
                 <Itinerary 
                   itinerary={itinerary}
                   onActivityUpdate={() => {}}
