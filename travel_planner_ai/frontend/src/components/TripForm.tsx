@@ -137,77 +137,94 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       </Row>
 
       {/* Travelers */}
-      <Row className="mb-3">
-        <Col md={4}>
-          <Form.Group>
-            <Form.Label className="d-flex align-items-center">
+      <Form.Group className="mb-3">
+        <div className="d-flex gap-3">
+          <div>
+            <Form.Label className="d-flex align-items-center gap-2">
               Adults
-              <span style={{ cursor: 'help' }}>
-                <OverlayTrigger
-                  placement="top"
-                  trigger={['hover', 'focus']}
-                  overlay={<Tooltip id={`adults-tooltip`}>Age 12 and above</Tooltip>}
-                >
-                  <FaInfoCircle className="ms-2 text-secondary" size={14} />
-                </OverlayTrigger>
-              </span>
+              <OverlayTrigger
+                placement="top"
+                trigger={['hover', 'focus', 'click']}
+                overlay={(
+                  <Tooltip id="adults-tooltip">
+                    <div className="text-start">
+                      <strong>Age 12+</strong>
+                      <div>Full-fare passengers age 12 and older</div>
+                      <div className="small text-muted mt-1">Example: Parents, teens</div>
+                    </div>
+                  </Tooltip>
+                )}
+              >
+                <div style={{ cursor: 'pointer' }}>
+                  <FaInfoCircle className="text-primary" size={16} />
+                </div>
+              </OverlayTrigger>
             </Form.Label>
             <Form.Control
-              className="shadow-sm"
               type="number"
               min="1"
               value={formData.adults}
-              onChange={(e) => setFormData({...formData, adults: parseInt(e.target.value)})}
+              onChange={(e) => setFormData({ ...formData, adults: parseInt(e.target.value) })}
             />
-          </Form.Group>
-        </Col>
-        <Col md={4}>
-          <Form.Group>
-            <Form.Label className="d-flex align-items-center">
+          </div>
+          <div>
+            <Form.Label className="d-flex align-items-center gap-2">
               Children
-              <span style={{ cursor: 'help' }}>
-                <OverlayTrigger
-                  placement="top"
-                  trigger={['hover', 'focus']}
-                  overlay={<Tooltip id={`children-tooltip`}>Age 2-11</Tooltip>}
-                >
-                  <FaInfoCircle className="ms-2 text-secondary" size={14} />
-                </OverlayTrigger>
-              </span>
+              <OverlayTrigger
+                placement="top"
+                trigger={['hover', 'focus', 'click']}
+                overlay={(
+                  <Tooltip id="children-tooltip">
+                    <div className="text-start">
+                      <strong>Age 2-11</strong>
+                      <div>Child passengers between 2 and 11 years old</div>
+                      <div className="small text-muted mt-1">Example: School-age kids</div>
+                    </div>
+                  </Tooltip>
+                )}
+              >
+                <div style={{ cursor: 'pointer' }}>
+                  <FaInfoCircle className="text-primary" size={16} />
+                </div>
+              </OverlayTrigger>
             </Form.Label>
             <Form.Control
-              className="shadow-sm"
               type="number"
               min="0"
               value={formData.children}
-              onChange={(e) => setFormData({...formData, children: parseInt(e.target.value)})}
+              onChange={(e) => setFormData({ ...formData, children: parseInt(e.target.value) })}
             />
-          </Form.Group>
-        </Col>
-        <Col md={4}>
-          <Form.Group>
-            <Form.Label className="d-flex align-items-center">
+          </div>
+          <div>
+            <Form.Label className="d-flex align-items-center gap-2">
               Infants
-              <span style={{ cursor: 'help' }}>
-                <OverlayTrigger
-                  placement="top"
-                  trigger={['hover', 'focus']}
-                  overlay={<Tooltip id={`infants-tooltip`}>Under 2 years</Tooltip>}
-                >
-                  <FaInfoCircle className="ms-2 text-secondary" size={14} />
-                </OverlayTrigger>
-              </span>
+              <OverlayTrigger
+                placement="top"
+                trigger={['hover', 'focus', 'click']}
+                overlay={(
+                  <Tooltip id="infants-tooltip">
+                    <div className="text-start">
+                      <strong>Under 2 years</strong>
+                      <div>Infant passengers under 2 years old</div>
+                      <div className="small text-muted mt-1">Example: Babies, toddlers</div>
+                    </div>
+                  </Tooltip>
+                )}
+              >
+                <div style={{ cursor: 'pointer' }}>
+                  <FaInfoCircle className="text-primary" size={16} />
+                </div>
+              </OverlayTrigger>
             </Form.Label>
             <Form.Control
-              className="shadow-sm"
               type="number"
               min="0"
               value={formData.infants}
-              onChange={(e) => setFormData({...formData, infants: parseInt(e.target.value)})}
+              onChange={(e) => setFormData({ ...formData, infants: parseInt(e.target.value) })}
             />
-          </Form.Group>
-        </Col>
-      </Row>
+          </div>
+        </div>
+      </Form.Group>
 
       {/* Intermediate Stops */}
       <Form.Group className="mb-3">

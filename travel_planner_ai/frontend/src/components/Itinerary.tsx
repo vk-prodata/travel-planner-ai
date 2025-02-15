@@ -147,10 +147,10 @@ const Itinerary: React.FC<ItineraryProps> = ({
                       {!suggestion && (
                         <Button
                           variant="outline-primary"
-                          className="ms-2 rounded-circle p-1"
+                          className="refresh-button ms-2"
                           onClick={() => handleSuggestAlternative(dayIndex, activityIndex, activity)}
                         >
-                          <BsArrowRepeat size={16} />
+                          <BsArrowRepeat size={20} />
                         </Button>
                       )}
                     </div>
