@@ -26,16 +26,20 @@ export const saveTrip = async (tripData: {
       destination: tripData.formData.destination,
     });
 
-    const headers = getAuthHeaders();
     const response = await fetch(`${API_URL}/api/trips`, {
       method: 'POST',
-      headers,
+      headers: getAuthHeaders(),
       credentials: 'include',
       body: JSON.stringify(tripData),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
+      
+      if (response.status === 409) {
+        throw new Error('You already have a similar trip planned. Please modify the existing trip or change the dates/destination.');
+      }
+
       console.error('Save trip error:', {
         status: response.status,
         statusText: response.statusText,
@@ -70,21 +74,47 @@ export const updateTrip = async (
   }
 ) => {
   try {
+    console.log('Updating trip:', {
+      tripId,
+      userId: tripData.userId,
+      destination: tripData.formData.destination,
+      itinerary: tripData.itinerary
+    });
+
+    const headers = getAuthHeaders();
     const response = await fetch(`${API_URL}/api/trips/${tripId}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
+      headers,
       credentials: 'include',
       body: JSON.stringify(tripData),
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to update trip');
+      const errorData = await response.json().catch(() => null);
+      console.error('Update trip error:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        error: errorData,
+        sentData: tripData
+      });
+
+      if (response.status === 401) {
+        throw new Error('Please sign in again to update your trip');
+      } else if (response.status === 403) {
+        throw new Error('You do not have permission to update this trip');
+      } else if (response.status === 404) {
+        throw new Error('Trip not found');
+      } else {
+        throw new Error(errorData?.detail || `Failed to update trip: ${response.statusText}`);
+      }
     }
 
-    return response.json();
+    const updatedTrip = await response.json();
+    console.log('Trip updated successfully:', updatedTrip);
+    return updatedTrip;
   } catch (error) {
-    console.error('Network error:', error);
+    console.error('Error updating trip:', error);
     throw error;
   }
 };

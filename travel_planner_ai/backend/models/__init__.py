@@ -1,12 +1,21 @@
-from .trip import TripRequest, TripResponse, TripCreate, Activity, DailyItinerary, TripItinerary
+from .trip import (
+    TripCreate,
+    TripResponse,
+    TripHash,
+    Activity,
+    DailyItinerary,
+    TripItinerary,
+    TripRequest
+)
 from .user import User
 
 __all__ = [
-    'TripRequest',
-    'TripResponse',
     'TripCreate',
+    'TripResponse',
+    'TripHash',
     'Activity',
     'DailyItinerary',
     'TripItinerary',
+    'TripRequest',
     'User'
 ]

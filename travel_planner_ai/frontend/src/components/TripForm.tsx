@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { TripFormData, TravelType, EntertainmentPreference, Stop } from '../types';
+import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel } from '../types';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 
 interface TripFormProps {
@@ -19,8 +19,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     adults: 1,
     children: 0,
     infants: 0,
-    intermediateStops: [] as Stop[],
+    intermediateStops: [],
     entertainmentPreferences: [],
+    budget: 'mid-range',
     budgetLevel: 'mid-range',
     language: 'en'
   });
@@ -40,15 +41,23 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
   const removeStop = (index: number) => {
     setFormData({
       ...formData,
-      intermediateStops: formData.intermediateStops.filter((_, i) => i !== index)
+      intermediateStops: formData.intermediateStops.filter((_: Stop, i: number) => i !== index)
     });
   };
 
   const togglePreference = (pref: EntertainmentPreference) => {
     const newPrefs = formData.entertainmentPreferences.includes(pref)
-      ? formData.entertainmentPreferences.filter(p => p !== pref)
+      ? formData.entertainmentPreferences.filter((p: EntertainmentPreference) => p !== pref)
       : [...formData.entertainmentPreferences, pref];
     setFormData({ ...formData, entertainmentPreferences: newPrefs });
+  };
+
+  const handleBudgetLevelChange = (level: BudgetLevel) => {
+    setFormData({
+      ...formData,
+      budgetLevel: level,
+      budget: level
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -238,7 +247,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
           </Button>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          {formData.intermediateStops.map((stop, index) => (
+          {formData.intermediateStops.map((stop: Stop, index: number) => (
             <Badge key={index} bg="secondary" className="d-flex align-items-center p-2">
               {stop.destination} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
               <Button variant="link" className="p-0 ms-2 text-light" onClick={() => removeStop(index)}>×</Button>
@@ -280,11 +289,11 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       <Form.Group className="mb-3">
         <Form.Label>Budget Level</Form.Label>
         <div className="d-flex gap-2">
-          {['budget', 'mid-range', 'luxury'].map((level) => (
+          {(['budget', 'mid-range', 'luxury'] as BudgetLevel[]).map((level) => (
             <Button
               key={level}
               variant={formData.budgetLevel === level ? 'success' : 'outline-success'}
-              onClick={() => setFormData({...formData, budgetLevel: level as any})}
+              onClick={() => handleBudgetLevelChange(level)}
             >
               {level}
             </Button>

@@ -1,15 +1,15 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
 import TripForm from './components/TripForm';
 import Itinerary from './components/Itinerary';
-import { TripFormData, TripItinerary } from './types';
+import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture, FaEdit, FaSave } from 'react-icons/fa';
 import { IoMdRefresh } from 'react-icons/io';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
-import { saveTrip } from './services/tripService';
+import { saveTrip, updateTrip } from './services/tripService';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -186,23 +186,76 @@ const App = () => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [currentTripId, setCurrentTripId] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [localItinerary, setLocalItinerary] = useState<TripItinerary | null>(null);
 
   const handleSubmit = async (data: TripFormData) => {
     setIsLoading(true);
     setFormData(data);
-    setTimeout(() => {
-      setItinerary(mockItinerary);
+    setCurrentTripId(null);
+    try {
+      setTimeout(() => {
+        setItinerary(mockItinerary);
+        setLocalItinerary(mockItinerary);
+        setHasUnsavedChanges(true);  // Enable Save button for new trips
+      }, 1500);
+    } catch (error) {
+      console.error('Error generating trip:', error);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const getTripTitle = () => {
-    if (!formData) return 'Your Trip';
-    return `Trip ${formData.origin ? `from ${formData.origin}` : ''} to ${formData.destination || 'Your Destination'}`;
+    if (!formData) return 'New Trip';
+    
+    const destination = formData.destination;
+    const startDate = formData.startDate ? new Date(formData.startDate).toLocaleDateString() : '';
+    const endDate = formData.endDate ? new Date(formData.endDate).toLocaleDateString() : '';
+    
+    let title = destination;
+    if (startDate && endDate) {
+      title += ` (${startDate} - ${endDate})`;
+    }
+    
+    return title;
+  };
+
+  const handleActivityUpdate = (dayIndex: number, activityIndex: number, updatedActivity: Activity) => {
+    if (!itinerary) return; // Guard clause for null itinerary
+
+    // Initialize localItinerary if it's null
+    if (!localItinerary) {
+      setLocalItinerary(itinerary);
+    }
+
+    const currentItinerary = localItinerary || itinerary;
+
+    const updatedItinerary: TripItinerary = {
+      ...currentItinerary,
+      tripId: currentItinerary.tripId,
+      days: currentItinerary.days.map((day, dIdx) => {
+        if (dIdx !== dayIndex) return day;
+        return {
+          ...day,
+          activities: day.activities.map((activity, aIdx) => {
+            if (aIdx !== activityIndex) return activity;
+            return updatedActivity;
+          })
+        };
+      })
+    };
+
+    setLocalItinerary(updatedItinerary);
+    setHasUnsavedChanges(true);
+
+    // Save to localStorage
+    localStorage.setItem('unsavedItinerary', JSON.stringify(updatedItinerary));
   };
 
   const handleSaveTrip = async () => {
-    if (!user || !itinerary || !formData) {
+    if (!user || !localItinerary || !formData) {
       toast.error('Please log in and generate an itinerary first');
       return;
     }
@@ -212,12 +265,23 @@ const App = () => {
       const tripData = {
         userId: user.id,
         formData,
-        itinerary
+        itinerary: localItinerary
       };
       
-      console.log('Attempting to save trip:', tripData);
-      await saveTrip(tripData);
-      toast.success('Trip saved successfully!');
+      let savedTrip;
+      if (currentTripId) {
+        savedTrip = await updateTrip(currentTripId, tripData);
+        toast.success('Trip updated successfully!');
+      } else {
+        savedTrip = await saveTrip(tripData);
+        setCurrentTripId(savedTrip.id);
+        toast.success('Trip saved successfully!');
+      }
+
+      // Clear unsaved changes after successful save
+      setHasUnsavedChanges(false);
+      setItinerary(localItinerary);
+      localStorage.removeItem('unsavedItinerary');
     } catch (error: any) {
       console.error('Error saving trip:', error);
       toast.error(error.message || 'Failed to save trip. Please try again.');
@@ -225,6 +289,23 @@ const App = () => {
       setIsSaving(false);
     }
   };
+
+  // Add useEffect to restore unsaved changes from localStorage
+  useEffect(() => {
+    const unsavedItinerary = localStorage.getItem('unsavedItinerary');
+    if (unsavedItinerary && itinerary) { // Add itinerary check
+      try {
+        const parsed = JSON.parse(unsavedItinerary) as TripItinerary;
+        if (parsed.tripId && Array.isArray(parsed.days)) { // Validate structure
+          setLocalItinerary(parsed);
+          setHasUnsavedChanges(true);
+        }
+      } catch (e) {
+        console.error('Error restoring unsaved changes:', e);
+        localStorage.removeItem('unsavedItinerary');
+      }
+    }
+  }, [itinerary]); // Add itinerary as dependency
 
   return (
     <Container fluid className="p-0 min-vh-100 d-flex flex-column">
@@ -314,7 +395,7 @@ const App = () => {
                       <Button
                         variant="primary"
                         onClick={handleSaveTrip}
-                        disabled={isSaving}
+                        disabled={isSaving || !hasUnsavedChanges}
                         className="d-flex align-items-center gap-2"
                       >
                         {isSaving ? (
@@ -325,7 +406,7 @@ const App = () => {
                         ) : (
                           <>
                             <FaSave />
-                            Save Trip
+                            {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
                           </>
                         )}
                       </Button>
@@ -357,7 +438,7 @@ const App = () => {
                 </div>
                 <Itinerary 
                   itinerary={itinerary}
-                  onActivityUpdate={() => {}}
+                  onActivityUpdate={handleActivityUpdate}
                   onSuggestAlternative={() => {}}
                   alternatives={mockAlternatives}
                 />

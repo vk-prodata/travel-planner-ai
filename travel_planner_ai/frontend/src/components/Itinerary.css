@@ -1,0 +1,60 @@
+.itinerary .day-container {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.itinerary .day-header {
+  margin: 0;
+  padding: 1rem;
+  background: #003366;
+  color: white;
+}
+
+.itinerary .activities-list {
+  padding: 1rem;
+}
+
+.itinerary .activity-content {
+  flex-grow: 1;
+}
+
+.itinerary .activity-time {
+  color: #003366;
+  font-size: 1.1rem;
+}
+
+.itinerary .activity-description {
+  margin: 0.5rem 0;
+  color: #333;
+}
+
+.itinerary .activity-type .badge {
+  font-weight: normal;
+  background-color: #e9ecef;
+  color: #003366;
+}
+
+.itinerary .suggestion-text {
+  color: #2c5282;
+  font-weight: 500;
+}
+
+.itinerary .card {
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.itinerary .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.itinerary button.rounded-circle {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+} 

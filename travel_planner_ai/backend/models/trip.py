@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import date, datetime
 from enum import Enum
+import hashlib
 
 class BudgetLevel(str, Enum):
     budget = "budget"
@@ -34,6 +35,19 @@ class TripItinerary(BaseModel):
     hotels: Optional[List[str]] = []
     generated_at: datetime
 
+class TripHash(BaseModel):
+    userId: str
+    origin: str
+    destination: str
+    startDate: str
+    endDate: str
+
+    def generate_hash(self) -> str:
+        # Create a deterministic string from trip details
+        hash_string = f"{self.userId}:{self.origin}:{self.destination}:{self.startDate}:{self.endDate}"
+        # Generate SHA-256 hash
+        return hashlib.sha256(hash_string.encode()).hexdigest()
+
 class TripCreate(BaseModel):
     userId: str
     formData: Dict[str, Any]
@@ -49,6 +63,7 @@ class TripCreate(BaseModel):
                     "endDate": "2024-03-07"
                 },
                 "itinerary": {
+                    "tripId": "will-be-replaced",
                     "days": []
                 }
             }
@@ -63,7 +78,7 @@ class TripRequest(BaseModel):
 
 class TripResponse(BaseModel):
     id: str
-    userId: str
+    user_id: str
     formData: Dict[str, Any]
     itinerary: Dict[str, Any]
     created_at: Optional[datetime] = None
