@@ -1,41 +1,50 @@
-from motor.motor_asyncio import AsyncIOMotorClient
-from typing import Optional
-from .config import settings  # Use relative import
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+from fastapi import HTTPException
+import os
+from dotenv import load_dotenv
 import logging
 
+load_dotenv()
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+if not MONGODB_URI:
+    raise ValueError("MONGODB_URI environment variable is not set")
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class Database:
-    client: Optional[AsyncIOMotorClient] = None
+try:
+    logger.info(f"Attempting to connect to MongoDB with URI: {MONGODB_URI.split('@')[0]}/*****@{MONGODB_URI.split('@')[1]}")
+    client = MongoClient(MONGODB_URI, server_api=ServerApi('1'))
     
-    @classmethod
-    def get_client(cls) -> AsyncIOMotorClient:
-        if cls.client is None:
-            try:
-                cls.client = AsyncIOMotorClient(settings.mongodb_url)
-                # Test the connection
-                cls.client.admin.command('ping')
-                logger.info("Successfully connected to MongoDB Atlas")
-            except Exception as e:
-                logger.error(f"Error connecting to MongoDB Atlas: {e}")
-                raise
-        return cls.client
+    # Send a ping to confirm a successful connection
+    client.admin.command('ping')
+    logger.info("Successfully connected to MongoDB!")
     
-    @classmethod
-    def get_db(cls):
-        return cls.get_client().get_database('travel_planner')
+    # Get database
+    db = client.get_database("travel_planner")
+    logger.info(f"Connected to database: {db.name}")
+    
+    # Get collections
+    trips_collection = db.get_collection("trips")
+    users_collection = db.get_collection("users")
+    logger.info("Collections initialized")
+    
+except Exception as e:
+    logger.error(f"Error connecting to MongoDB: {e}")
+    raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
 
-    @classmethod
-    def get_trips_collection(cls):
-        return cls.get_db()['trip']  # Use 'trip' collection
+def get_db():
+    return db
 
 # Simplified collection access
 def get_trips_collection():
-    return Database.get_trips_collection()
+    return trips_collection
 
 # Async functions for collection access
 async def get_user_collection():
-    return Database.get_db().users
+    return users_collection
 
 # Example usage in your routes:
 # async def get_user(user_id: str):

@@ -9,6 +9,10 @@ import { FaPlaneDeparture, FaEdit, FaSave } from 'react-icons/fa';
 import { IoMdRefresh } from 'react-icons/io';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
+import { saveTrip } from './services/tripService';
+import { toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const mockItinerary = {
   tripId: '123',
@@ -162,6 +166,18 @@ const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
+const SignInPrompt: React.FC = () => (
+  <div className="alert alert-warning d-flex align-items-center mt-3" role="alert">
+    <div className="d-flex align-items-center">
+      <i className="fas fa-exclamation-triangle me-2"></i>
+      <div>
+        Please <strong>sign in</strong> to save your trips and access them later.
+      </div>
+    </div>
+    <AuthForm />
+  </div>
+);
+
 const App = () => {
   const { user, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -169,6 +185,7 @@ const App = () => {
   const [formData, setFormData] = useState<TripFormData | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (data: TripFormData) => {
     setIsLoading(true);
@@ -184,8 +201,33 @@ const App = () => {
     return `Trip ${formData.origin ? `from ${formData.origin}` : ''} to ${formData.destination || 'Your Destination'}`;
   };
 
+  const handleSaveTrip = async () => {
+    if (!user || !itinerary || !formData) {
+      toast.error('Please log in and generate an itinerary first');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const tripData = {
+        userId: user.id,
+        formData,
+        itinerary
+      };
+      
+      console.log('Attempting to save trip:', tripData);
+      await saveTrip(tripData);
+      toast.success('Trip saved successfully!');
+    } catch (error: any) {
+      console.error('Error saving trip:', error);
+      toast.error(error.message || 'Failed to save trip. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <Container fluid className="p-0">
+    <Container fluid className="p-0 min-vh-100 d-flex flex-column">
       <Row className="g-0">
         <Col md={4} className="border-end shadow-sm" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
           <div className="p-2">
@@ -212,6 +254,7 @@ const App = () => {
                 )}
               </div>
               <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
+              {!user && <SignInPrompt />}
             </div>
           </div>
         </Col>
@@ -266,18 +309,51 @@ const App = () => {
                       </Button>
                     </div>
                   )}
-                  <Button 
-                    variant="outline-secondary"
-                    size="sm"
-                    className="rounded-circle d-flex align-items-center justify-content-center"
-                    style={{ width: '32px', height: '32px' }}
-                    onClick={() => {
-                      // Refresh logic here
-                      handleSubmit(formData!);
-                    }}
-                  >
-                    <IoMdRefresh size={16} />
-                  </Button>
+                  <div className="d-flex gap-2">
+                    {user ? (
+                      <Button
+                        variant="primary"
+                        onClick={handleSaveTrip}
+                        disabled={isSaving}
+                        className="d-flex align-items-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <FaSave />
+                            Save Trip
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <div className="d-flex align-items-center gap-2">
+                        <Button
+                          variant="outline-primary"
+                          disabled
+                          className="d-flex align-items-center gap-2"
+                        >
+                          <FaSave />
+                          Save Trip
+                        </Button>
+                        <small className="text-muted">
+                          Sign in to save
+                        </small>
+                      </div>
+                    )}
+                    <Button 
+                      variant="outline-secondary"
+                      onClick={() => handleSubmit(formData!)}
+                      disabled={isLoading}
+                      className="d-flex align-items-center gap-2"
+                    >
+                      <IoMdRefresh />
+                      Regenerate
+                    </Button>
+                  </div>
                 </div>
                 <Itinerary 
                   itinerary={itinerary}
@@ -300,6 +376,17 @@ const App = () => {
           </div>
         </Col>
       </Row>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </Container>
   );
 };

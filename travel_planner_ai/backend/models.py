@@ -54,3 +54,23 @@ class TripItinerary(BaseModel):
     itinerary: List[DailyItinerary]
     hotels: Optional[List[str]] = []  # Hotel recommendations
     generated_at: datetime
+
+class TripCreate(BaseModel):
+    userId: str
+    formData: dict
+    itinerary: dict
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "userId": "123",
+                "formData": {
+                    "destination": "Paris",
+                    "startDate": "2024-03-01",
+                    "endDate": "2024-03-07"
+                },
+                "itinerary": {
+                    "days": []
+                }
+            }
+        }

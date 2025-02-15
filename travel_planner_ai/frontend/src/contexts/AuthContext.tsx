@@ -78,21 +78,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async () => {
-    if (!window.google) {
-      console.error('Google API not loaded');
-      return;
-    }
+    if (tokenClient) {
+      return new Promise<void>((resolve) => {
+        tokenClient.callback = async (response: any) => {
+          if (response.error) {
+            console.error('Sign in error:', response.error);
+            return;
+          }
 
-    try {
-      if (tokenClient) {
-        tokenClient.requestAccessToken();
-      } else {
-        console.error('Token client not initialized');
-      }
-    } catch (error) {
-      console.error('Error during sign-in:', error);
-      throw error;
+          try {
+            console.log('Auth Response:', {
+              tokenType: response.token_type,
+              scope: response.scope,
+              // Don't log the full token for security
+              tokenLength: response.access_token?.length
+            });
+
+            const token = response.access_token;
+            localStorage.setItem('token', token);
+            
+            const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }).then(res => res.json());
+
+            console.log('User Info:', {
+              id: userInfo.sub,
+              email: userInfo.email,
+              name: userInfo.name
+            });
+
+            setUser({
+              id: userInfo.sub,
+              name: userInfo.name,
+              email: userInfo.email
+            });
+            
+            resolve();
+          } catch (error) {
+            console.error('Error during sign in:', error);
+            throw error;
+          }
+        };
+
+        tokenClient.requestAccessToken({
+          prompt: 'consent'
+        });
+      });
     }
+    return Promise.resolve();
   };
 
   const signOut = async (): Promise<void> => {
