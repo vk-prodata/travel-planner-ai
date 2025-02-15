@@ -259,15 +259,18 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
             'food',
             'adventure',
             'educational',
-            'nightlife'
+            'nightlife',
+            'hidden-gems',
+            'must-see'
           ].map((pref) => (
             <Button
               key={pref}
               variant={formData.entertainmentPreferences.includes(pref as EntertainmentPreference) ? 'primary' : 'outline-primary'}
               onClick={() => togglePreference(pref as EntertainmentPreference)}
               size="sm"
+              className="text-capitalize"
             >
-              {pref}
+              {pref.replace('-', ' ')}
             </Button>
           ))}
         </div>

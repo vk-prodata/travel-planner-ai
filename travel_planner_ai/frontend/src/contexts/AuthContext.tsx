@@ -38,30 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const client = window.google.accounts.oauth2.initTokenClient({
               client_id: clientId,
               scope: 'email profile openid',
-              callback: (response: any) => {
-                if (response.error) {
-                  console.error('OAuth error:', response);
-                  return;
-                }
-                
-                // Use the access token to get user info
-                fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: {
-                    'Authorization': `Bearer ${response.access_token}`
-                  }
-                })
-                .then(res => res.json())
-                .then(data => {
-                  setUser({
-                    id: data.sub,
-                    name: data.name,
-                    email: data.email
-                  });
-                })
-                .catch(error => {
-                  console.error('Error fetching user info:', error);
-                });
-              },
+              callback: handleCredentialResponse,
             });
             
             setTokenClient(client);
@@ -77,6 +54,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     loadGoogleScript();
   }, []);
+
+  const handleCredentialResponse = async (response: any) => {
+    try {
+      // Use the access token to get user info
+      const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${response.access_token}`
+        }
+      }).then(res => res.json());
+
+      setUser({
+        id: userInfo.sub,  // Use the Google user ID
+        name: userInfo.name,
+        email: userInfo.email
+      });
+
+      // Store the token
+      localStorage.setItem('token', response.credential);
+    } catch (error) {
+      console.error('Error handling credential:', error);
+    }
+  };
 
   const signIn = async () => {
     if (!window.google) {
