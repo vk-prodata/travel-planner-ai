@@ -111,3 +111,5 @@ dmypy.json
 *.log
 logs/ 
 .env
+instructions.md
+.cursorrules

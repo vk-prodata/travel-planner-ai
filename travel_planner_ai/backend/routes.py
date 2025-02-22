@@ -7,9 +7,14 @@ from datetime import datetime
 from bson import ObjectId
 import logging
 import uuid
+from .ai.base_client import BaseAIClient
+import os
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Initialize AI client
+ai_client = BaseAIClient(api_key=os.getenv("OPENAI_API_KEY"))
 
 @router.post("/trips")
 async def create_trip(
@@ -158,4 +163,22 @@ async def update_trip(
         
     except Exception as e:
         logger.error(f"Error updating trip: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate-itinerary")
+async def generate_itinerary(
+    trip_request: TripCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        # Generate itinerary using AI
+        itinerary = ai_client.generate_itinerary(trip_request.formData)
+        
+        # Return the generated itinerary
+        return {
+            "success": True,
+            "itinerary": itinerary
+        }
+    except Exception as e:
+        logger.error(f"Error generating itinerary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
