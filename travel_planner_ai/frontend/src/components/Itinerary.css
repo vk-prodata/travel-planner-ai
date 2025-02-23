@@ -82,4 +82,29 @@
 
 .itinerary .refresh-button:active svg {
   transform: rotate(180deg);
+}
+
+.itinerary .delete-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.itinerary .delete-button:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.itinerary .spin {
+  animation: spin 1s linear infinite;
 } 

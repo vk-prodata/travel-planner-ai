@@ -155,9 +155,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                   </Tooltip>
                 )}
               >
-                <div style={{ cursor: 'pointer' }}>
+                <span style={{ cursor: 'pointer' }}>
                   <FaInfoCircle className="text-primary" size={16} />
-                </div>
+                </span>
               </OverlayTrigger>
             </Form.Label>
             <Form.Control
@@ -183,9 +183,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                   </Tooltip>
                 )}
               >
-                <div style={{ cursor: 'pointer' }}>
+                <span style={{ cursor: 'pointer' }}>
                   <FaInfoCircle className="text-primary" size={16} />
-                </div>
+                </span>
               </OverlayTrigger>
             </Form.Label>
             <Form.Control
@@ -211,9 +211,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                   </Tooltip>
                 )}
               >
-                <div style={{ cursor: 'pointer' }}>
+                <span style={{ cursor: 'pointer' }}>
                   <FaInfoCircle className="text-primary" size={16} />
-                </div>
+                </span>
               </OverlayTrigger>
             </Form.Label>
             <Form.Control
@@ -232,9 +232,11 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
           Intermediate Stops
           <OverlayTrigger
             placement="top"
-            overlay={<Tooltip>Add locations you want to visit during your trip</Tooltip>}
+            overlay={<Tooltip id="stops-tooltip">Add locations you want to visit during your trip</Tooltip>}
           >
-            <FaInfoCircle className="ms-2 text-secondary" size={14} />
+            <span className="ms-2">
+              <FaInfoCircle className="text-secondary" size={14} />
+            </span>
           </OverlayTrigger>
         </Form.Label>
         <div className="d-flex gap-2 mb-2">

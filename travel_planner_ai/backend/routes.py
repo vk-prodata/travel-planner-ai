@@ -1,5 +1,5 @@
 # backend/routes.py
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from .models import TripCreate, TripResponse, TripHash
 from .database import get_db
 from .auth import get_current_user
@@ -8,13 +8,34 @@ from bson import ObjectId
 import logging
 import uuid
 from .ai.base_client import BaseAIClient
+from .config.ai_config import get_model_config
 import os
+from typing import Optional
+from pathlib import Path
+import json
+from pydantic import BaseModel
+
+# Set up file logging
+log_dir = Path(__file__).parent.parent / "logs"
+log_dir.mkdir(exist_ok=True)
+
+file_handler = logging.FileHandler(log_dir / f"travel_planner_{datetime.now().strftime('%Y%m%d')}.log")
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+))
 
 logger = logging.getLogger(__name__)
+logger.addHandler(file_handler)
+
 router = APIRouter()
 
 # Initialize AI client
 ai_client = BaseAIClient(api_key=os.getenv("OPENAI_API_KEY"))
+
+class RefreshActivityRequest(BaseModel):
+    day_index: int
+    activity_index: int
+    activity: dict
 
 @router.post("/trips")
 async def create_trip(
@@ -171,14 +192,171 @@ async def generate_itinerary(
     current_user: dict = Depends(get_current_user)
 ):
     try:
-        # Generate itinerary using AI
-        itinerary = ai_client.generate_itinerary(trip_request.formData)
+        logger.info(f"Generating itinerary for user {current_user['id']} ({current_user.get('email')})")
         
-        # Return the generated itinerary
+        # Log request data
+        logger.info(f"Request data: {json.dumps(trip_request.formData, indent=2)}")
+
+        # Generate itinerary using AI
+        try:
+            itinerary = await ai_client.generate_itinerary(trip_request.formData)
+            
+            # Log raw AI response
+            logger.debug(f"Raw AI response: {json.dumps(itinerary, indent=2)}")
+            
+            if not itinerary or not isinstance(itinerary, dict):
+                logger.error(f"Invalid AI response format: {itinerary}")
+                raise ValueError("Invalid response from AI service")
+            
+            # Ensure the response has the correct structure
+            if not itinerary.get('days'):
+                logger.error("No days found in itinerary")
+                raise ValueError("Invalid itinerary format: no days found")
+
+            # Format each day's activities
+            for day in itinerary['days']:
+                if not day.get('activities'):
+                    day['activities'] = []
+                for activity in day['activities']:
+                    if not activity.get('time'):
+                        activity['time'] = "9:00 AM"
+                    if not activity.get('description'):
+                        activity['description'] = "No content generated"
+                    if not activity.get('type'):
+                        activity['type'] = "activity"
+                    if not activity.get('id'):
+                        activity['id'] = f"{day['date']}-{id(activity)}"
+
+            logger.info(f"Successfully formatted itinerary for {current_user.get('email')}")
+            logger.debug(f"Final formatted itinerary: {json.dumps(itinerary, indent=2)}")
+            
+            return {
+                "success": True,
+                "itinerary": itinerary
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating itinerary: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Dear {current_user.get('email')}, we encountered an error: {str(e)}"
+            )
+
+    except HTTPException as he:
+        logger.error(f"HTTP Exception: {str(he)}", exc_info=True)
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Dear {current_user.get('email')}, an unexpected error occurred"
+        )
+
+@router.delete("/activities/{day_index}/{activity_index}")
+async def delete_activity(
+    day_index: int,
+    activity_index: int,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        logger.info(f"Deleting activity {activity_index} from day {day_index} for user {current_user.get('email')}")
+        
+        # Simply return success since the frontend handles the actual deletion
         return {
             "success": True,
-            "itinerary": itinerary
+            "message": f"Activity {activity_index} deleted from day {day_index}"
         }
     except Exception as e:
-        logger.error(f"Error generating itinerary: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error deleting activity: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.post("/refresh-activity")
+async def refresh_activity(
+    request: RefreshActivityRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        logger.info(f"Refreshing activity for user {current_user.get('email')}")
+        logger.debug(f"Request data: {request}")
+        
+        # Generate a new activity using AI
+        prompt = f"""
+        Generate a new activity to replace:
+        {request.activity.get('description')}
+        
+        IMPORTANT: Use this EXACT format:
+        [ACTIVITY_START]
+        Time: {request.activity.get('time')}
+        Type: {request.activity.get('type', 'activity')}
+        Description: (new activity description)
+        [ACTIVITY_END]
+
+        Rules:
+        1. Keep the same time slot: {request.activity.get('time')}
+        2. Keep similar type of activity
+        3. Make it family-friendly and engaging
+        4. Include specific details and locations
+        """
+        
+        try:
+            model_config = get_model_config(ai_client.model)
+            response = await ai_client.client.chat.completions.create(
+                model=ai_client.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                **model_config
+            )
+            
+            content = response.choices[0].message.content
+            logger.debug(f"AI response for refresh: {content}")
+            
+            # Parse the new activity
+            lines = [line.strip() for line in content.split('\n') if line.strip()]
+            new_activity = {
+                'id': request.activity.get('id'),
+                'time': request.activity.get('time'),
+                'type': request.activity.get('type', 'activity')
+            }
+            
+            for line in lines:
+                if line.startswith('Time: '):
+                    new_activity['time'] = line.replace('Time: ', '').strip()
+                elif line.startswith('Type: '):
+                    new_activity['type'] = line.replace('Type: ', '').strip().lower()
+                elif line.startswith('Description: '):
+                    new_activity['description'] = line.replace('Description: ', '').strip()
+            
+            if not new_activity.get('description'):
+                raise ValueError("No description generated for new activity")
+            
+            logger.info(f"Successfully generated new activity: {json.dumps(new_activity, indent=2)}")
+            
+            return {
+                "success": True,
+                "activity": new_activity
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating new activity: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e)
+            )
+            
+    except Exception as e:
+        logger.error(f"Error refreshing activity: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

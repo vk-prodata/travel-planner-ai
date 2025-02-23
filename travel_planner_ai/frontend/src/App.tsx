@@ -14,136 +14,6 @@ import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const mockItinerary = {
-  tripId: '123',
-  days: [
-    {
-      date: 'April 16',
-      activities: [
-        {
-          id: '1',
-          time: '7:00 AM',
-          description: 'Arrive in Orlando',
-          type: 'travel'
-        },
-        {
-          id: '2',
-          time: '8:00 AM',
-          description: 'Pick up your rental car; drive ~1.5–2 hours to Tampa/Dunedin area',
-          type: 'travel'
-        },
-        {
-          id: '3',
-          time: '10:30 AM',
-          description: 'Honeymoon Island State Park (near Dunedin). Entry fee: $8 per vehicle. Large sandy beaches, shallow areas for splashing, lots of shorebirds.',
-          type: 'outdoor'
-        },
-        {
-          id: '4',
-          time: '12:30 PM',
-          description: 'Slavic Lunch option: Pierogi Grill in Clearwater for family-friendly Polish food',
-          type: 'food'
-        },
-        {
-          id: '5',
-          time: '1:30 PM',
-          description: 'Head to St. Petersburg. Weedon Island Preserve for a nature boardwalk and optional kayak rentals',
-          type: 'outdoor'
-        },
-        {
-          id: '6',
-          time: '4:30 PM',
-          description: 'Drive to Tampa and check in to your hotel',
-          type: 'travel'
-        },
-        {
-          id: '7',
-          time: '6:00 PM',
-          description: 'Tampa Riverwalk - scenic walkway with street performers, splash pad and playground at Water Works Park, Pirate Water Taxi ride option',
-          type: 'entertainment'
-        },
-        {
-          id: '8',
-          time: '7:30 PM',
-          description: 'Dinner in Tampa. Options: Babushka\'s Hyde Park (Slavic) or Downtown/Ybor City for seafood/Cuban',
-          type: 'food'
-        }
-      ]
-    },
-    {
-      date: 'April 17',
-      activities: [
-        {
-          id: '9',
-          time: '8:00 AM',
-          description: 'Breakfast near your hotel',
-          type: 'food'
-        },
-        {
-          id: '10',
-          time: '9:00 AM',
-          description: 'Hillsborough River State Park. Easy trails, turtle and alligator sightings, suspension bridge. Entry: $6 per vehicle',
-          type: 'outdoor'
-        },
-        {
-          id: '11',
-          time: '11:00 AM',
-          description: 'Drive to Sarasota (1-1.5 hours)',
-          type: 'travel'
-        },
-        {
-          id: '12',
-          time: '12:30 PM',
-          description: 'Lunch in Sarasota Downtown - casual cafes and outdoor spots',
-          type: 'food'
-        },
-        {
-          id: '13',
-          time: '2:00 PM',
-          description: 'Beach time at Siesta Key Beach or Lido Key Beach. White sand, shallow waters, perfect for families',
-          type: 'outdoor'
-        },
-        {
-          id: '14',
-          time: '4:30 PM',
-          description: 'Myakka River State Park - nature trails, canopy walkway, wildlife spotting. Entry: $6',
-          type: 'outdoor'
-        },
-        {
-          id: '15',
-          time: '6:30 PM',
-          description: 'Dinner in Sarasota - seafood, BBQ, or family-friendly international spots',
-          type: 'food'
-        }
-      ]
-    }
-  ]
-};
-
-// Mock alternative suggestions
-const mockAlternatives = {
-  'food': [
-    'Try local food trucks gathering - variety of cuisines, casual atmosphere',
-    'Visit the International Food Court - multiple options under one roof',
-    'Family-style Italian restaurant with kids menu and activities'
-  ],
-  'outdoor': [
-    'Indoor adventure park - perfect backup for rainy weather',
-    'Interactive museum with hands-on exhibits',
-    'Botanical gardens with butterfly house'
-  ],
-  'entertainment': [
-    'Local theater with family-friendly shows',
-    'Arcade and gaming center',
-    'Indoor trampoline park'
-  ],
-  'travel': [
-    'Alternative scenic route with photo stops',
-    'Public transport option with city views',
-    'Private shuttle service'
-  ]
-};
-
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
     .split(' ')
@@ -194,14 +64,67 @@ const App = () => {
     setIsLoading(true);
     setFormData(data);
     setCurrentTripId(null);
+
     try {
-      setTimeout(() => {
+      if (!user) {
+        // Use mock data only for non-signed-in users
+        const mockItinerary = {
+          tripId: String(Date.now()),
+          days: [
+            {
+              date: new Date(data.startDate).toLocaleDateString(),
+              activities: [
+                {
+                  id: '1',
+                  time: '9:00 AM',
+                  description: 'Start your journey to ' + data.destination,
+                  type: 'travel'
+                },
+                {
+                  id: '2',
+                  time: '12:00 PM',
+                  description: 'Lunch at local restaurant',
+                  type: 'food'
+                },
+                {
+                  id: '3',
+                  time: '2:00 PM',
+                  description: 'Explore city center',
+                  type: 'activity'
+                }
+              ]
+            }
+          ]
+        };
         setItinerary(mockItinerary);
         setLocalItinerary(mockItinerary);
-        setHasUnsavedChanges(true);  // Enable Save button for new trips
-      }, 1500);
+        setHasUnsavedChanges(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Validate form data
+      if (!data.destination || !data.startDate || !data.endDate) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      // Check dates
+      const start = new Date(data.startDate);
+      const end = new Date(data.endDate);
+      if (end < start) {
+        throw new Error('End date must be after start date');
+      }
+
+      const newItinerary = await generateItinerary(data);
+      if (newItinerary) {
+        setItinerary(newItinerary);
+        setLocalItinerary(newItinerary);
+        setHasUnsavedChanges(true);
+        toast.success('Trip generated successfully!');
+      }
     } catch (error) {
-      console.error('Error generating trip:', error);
+      console.error('Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate itinerary');
     } finally {
       setIsLoading(false);
     }
@@ -306,6 +229,157 @@ const App = () => {
       }
     }
   }, [itinerary]); // Add itinerary as dependency
+
+  const generateItinerary = async (formData: TripFormData) => {
+    if (!user) {
+      toast.error('Please sign in to generate an itinerary');
+      return null;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/api/generate-itinerary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          formData: {
+            ...formData,
+            origin: formData.origin || '',
+            destination: formData.destination,
+            startDate: formData.startDate,
+            endDate: formData.endDate,
+            travelType: formData.travelType,
+            adults: formData.adults,
+            children: formData.children || 0,
+            infants: formData.infants || 0,
+            budgetLevel: formData.budgetLevel,
+            entertainmentPreferences: formData.entertainmentPreferences || [],
+            intermediateStops: formData.intermediateStops || []
+          }
+        })
+      });
+
+      let errorMessage = 'Failed to generate itinerary';
+      
+      try {
+        const data = await response.json();
+        
+        if (!response.ok) {
+          errorMessage = `Error (${response.status}): ${data.detail || 'Unknown error'}`;
+          console.error('API Error:', {
+            status: response.status,
+            data: data,
+            user: user.email
+          });
+          throw new Error(errorMessage);
+        }
+
+        if (!data.success || !data.itinerary) {
+          throw new Error('Invalid response format from server');
+        }
+
+        return data.itinerary;
+      } catch (parseError) {
+        console.error('Response parsing error:', parseError);
+        throw new Error(`Server error: ${errorMessage}. Please try again later.`);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Trip generation error:', {
+        error,
+        user: user.email,
+        formData
+      });
+      toast.error(`Dear ${user.email}, there was an error: ${errorMsg}`);
+      throw error;
+    }
+  };
+
+  const refreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity) => {
+    if (!user || !formData) {
+      toast.error('Please sign in to refresh activities');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/api/refresh-activity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          day_index: dayIndex,
+          activity_index: activityIndex,
+          activity: activity
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh activity');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.activity && itinerary) {
+        // Create new itinerary with updated activity
+        const newItinerary = {
+          ...itinerary,
+          days: itinerary.days.map((day, dIndex) => {
+            if (dIndex === dayIndex) {
+              return {
+                ...day,
+                activities: day.activities.map((act, aIndex) => {
+                  if (aIndex === activityIndex) {
+                    return data.activity;
+                  }
+                  return act;
+                })
+              };
+            }
+            return day;
+          })
+        };
+
+        // Update both states
+        setItinerary(newItinerary);
+        setLocalItinerary(newItinerary);
+        setHasUnsavedChanges(true);
+        
+        toast.success('Activity refreshed successfully!');
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error refreshing activity:', error);
+      toast.error('Failed to refresh activity. Please try again.');
+      throw error;
+    }
+  };
+
+  const handleActivityDelete = (dayIndex: number, activityIndex: number) => {
+    if (!itinerary) return;
+    
+    const newItinerary = {
+      ...itinerary,
+      days: itinerary.days.map((day, dIndex) => {
+        if (dIndex === dayIndex) {
+          return {
+            ...day,
+            activities: day.activities.filter((_, aIndex) => aIndex !== activityIndex)
+          };
+        }
+        return day;
+      })
+    };
+    
+    setItinerary(newItinerary);
+    setLocalItinerary(newItinerary);
+    setHasUnsavedChanges(true);
+  };
 
   return (
     <Container fluid className="p-0 min-vh-100 d-flex flex-column">
@@ -439,8 +513,9 @@ const App = () => {
                 <Itinerary 
                   itinerary={itinerary}
                   onActivityUpdate={handleActivityUpdate}
-                  onSuggestAlternative={() => {}}
-                  alternatives={mockAlternatives}
+                  onActivityDelete={handleActivityDelete}
+                  onActivityRefresh={refreshActivity}
+                  isLoading={isLoading}
                 />
               </div>
             ) : (
@@ -467,6 +542,11 @@ const App = () => {
         pauseOnFocusLoss
         draggable
         pauseOnHover
+        theme="colored"
+        toastStyle={{
+          backgroundColor: '#363636',
+          color: '#fff'
+        }}
       />
     </Container>
   );

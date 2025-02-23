@@ -1,109 +1,70 @@
 import * as React from 'react';
 import { Card, Button } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
-import { BsArrowRepeat, BsCheck, BsX } from 'react-icons/bs';
-import { useState, useEffect } from 'react';
+import { BsArrowRepeat, BsCheck, BsX, BsTrash } from 'react-icons/bs';
+import { useState } from 'react';
+import { toast } from 'react-toastify';
 
 interface ItineraryProps {
   itinerary: TripItinerary;
   onActivityUpdate: (dayIndex: number, activityIndex: number, updatedActivity: Activity) => void;
-  onSuggestAlternative: (type: string) => void;
-  alternatives: Record<string, string[]>;
+  onActivityDelete: (dayIndex: number, activityIndex: number) => void;
+  onActivityRefresh: (dayIndex: number, activityIndex: number, activity: Activity) => Promise<void>;
+  isLoading: boolean;
 }
 
 const Itinerary: React.FC<ItineraryProps> = ({ 
   itinerary, 
   onActivityUpdate,
-  alternatives 
+  onActivityDelete,
+  onActivityRefresh,
+  isLoading 
 }) => {
   const [altSuggestions, setAltSuggestions] = useState<{[key: string]: string}>({});
-  const [localItinerary, setLocalItinerary] = useState(itinerary);
+  const [refreshingActivities, setRefreshingActivities] = useState<{[key: string]: boolean}>({});
 
-  // Update local itinerary when prop changes
-  useEffect(() => {
-    setLocalItinerary(itinerary);
-  }, [itinerary]);
-
-  // Save suggestions to localStorage
-  useEffect(() => {
-    if (Object.keys(altSuggestions).length > 0) {
-      localStorage.setItem('activitySuggestions', JSON.stringify(altSuggestions));
+  const handleRefreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity) => {
+    try {
+      setRefreshingActivities(prev => ({ ...prev, [`${dayIndex}-${activityIndex}`]: true }));
+      await onActivityRefresh(dayIndex, activityIndex, activity);
+    } catch (error) {
+      console.error('Error refreshing activity:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to refresh activity');
+    } finally {
+      setRefreshingActivities(prev => ({ ...prev, [`${dayIndex}-${activityIndex}`]: false }));
     }
-  }, [altSuggestions]);
+  };
 
-  // Restore suggestions from localStorage
-  useEffect(() => {
-    const savedSuggestions = localStorage.getItem('activitySuggestions');
-    if (savedSuggestions) {
-      try {
-        setAltSuggestions(JSON.parse(savedSuggestions));
-      } catch (e) {
-        console.error('Error restoring suggestions:', e);
-        localStorage.removeItem('activitySuggestions');
+  const handleDeleteActivity = async (dayIndex: number, activityIndex: number) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/activities/${dayIndex}/${activityIndex}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete activity');
       }
+
+      onActivityDelete(dayIndex, activityIndex);
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      toast.error('Failed to delete activity');
     }
-  }, []);
-
-  const handleSuggestAlternative = (dayIndex: number, activityIndex: number, activity: Activity) => {
-    const mockAlts = alternatives[activity.type] || [];
-    const randomAlt = mockAlts[Math.floor(Math.random() * mockAlts.length)];
-    setAltSuggestions(prev => ({
-      ...prev,
-      [`${dayIndex}-${activityIndex}`]: randomAlt
-    }));
-  };
-
-  const handleApplyAlternative = (dayIndex: number, activityIndex: number, activity: Activity, alternative: string) => {
-    const updatedActivity = {
-      ...activity,
-      description: alternative
-    };
-
-    // Update local state immediately
-    setLocalItinerary(prev => ({
-      ...prev,
-      days: prev.days.map((day, dIdx) => {
-        if (dIdx !== dayIndex) return day;
-        return {
-          ...day,
-          activities: day.activities.map((act, aIdx) => {
-            if (aIdx !== activityIndex) return act;
-            return updatedActivity;
-          })
-        };
-      })
-    }));
-    
-    // Remove the suggestion
-    setAltSuggestions(prev => {
-      const newState = { ...prev };
-      delete newState[`${dayIndex}-${activityIndex}`];
-      localStorage.setItem('activitySuggestions', JSON.stringify(newState));
-      return newState;
-    });
-
-    // Notify parent component for saving to database later
-    onActivityUpdate(dayIndex, activityIndex, updatedActivity);
-  };
-
-  const handleCancelAlternative = (dayIndex: number, activityIndex: number) => {
-    setAltSuggestions(prev => {
-      const newState = { ...prev };
-      delete newState[`${dayIndex}-${activityIndex}`];
-      localStorage.setItem('activitySuggestions', JSON.stringify(newState));
-      return newState;
-    });
   };
 
   return (
     <div className="itinerary">
-      {localItinerary.days.map((day, dayIndex) => (
+      {itinerary.days.map((day, dayIndex) => (
         <div key={day.date} className="day-container mb-4">
           <h2 className="day-header bg-primary text-white p-3 rounded">{day.date}</h2>
           <div className="activities-list">
             {day.activities.map((activity, activityIndex) => {
-              const suggestionKey = `${dayIndex}-${activityIndex}`;
-              const suggestion = altSuggestions[suggestionKey];
+              const activityKey = `${dayIndex}-${activityIndex}`;
+              const suggestion = altSuggestions[activityKey];
+              const isRefreshing = refreshingActivities[activityKey];
 
               return (
                 <Card key={activity.id} className="mb-2 shadow-sm">
@@ -122,7 +83,17 @@ const Itinerary: React.FC<ItineraryProps> = ({
                                   variant="success"
                                   size="sm"
                                   className="d-flex align-items-center gap-1"
-                                  onClick={() => handleApplyAlternative(dayIndex, activityIndex, activity, suggestion)}
+                                  onClick={() => {
+                                    onActivityUpdate(dayIndex, activityIndex, {
+                                      ...activity,
+                                      description: suggestion
+                                    });
+                                    setAltSuggestions(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[activityKey];
+                                      return newState;
+                                    });
+                                  }}
                                 >
                                   <BsCheck size={16} />
                                   Accept
@@ -131,7 +102,13 @@ const Itinerary: React.FC<ItineraryProps> = ({
                                   variant="outline-secondary"
                                   size="sm"
                                   className="d-flex align-items-center gap-1"
-                                  onClick={() => handleCancelAlternative(dayIndex, activityIndex)}
+                                  onClick={() => {
+                                    setAltSuggestions(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[activityKey];
+                                      return newState;
+                                    });
+                                  }}
                                 >
                                   <BsX size={16} />
                                   Reject
@@ -144,15 +121,27 @@ const Itinerary: React.FC<ItineraryProps> = ({
                           <span className="badge bg-light text-primary">{activity.type}</span>
                         </div>
                       </div>
-                      {!suggestion && (
+                      <div className="d-flex gap-2">
                         <Button
                           variant="outline-primary"
-                          className="refresh-button ms-2"
-                          onClick={() => handleSuggestAlternative(dayIndex, activityIndex, activity)}
+                          className="refresh-button"
+                          onClick={() => handleRefreshActivity(dayIndex, activityIndex, activity)}
+                          disabled={isRefreshing || isLoading}
                         >
-                          <BsArrowRepeat size={20} />
+                          <BsArrowRepeat 
+                            size={20} 
+                            className={isRefreshing ? 'spin' : ''} 
+                          />
                         </Button>
-                      )}
+                        <Button
+                          variant="outline-danger"
+                          className="delete-button"
+                          onClick={() => handleDeleteActivity(dayIndex, activityIndex)}
+                          disabled={isLoading}
+                        >
+                          <BsTrash size={16} />
+                        </Button>
+                      </div>
                     </div>
                   </Card.Body>
                 </Card>

@@ -1,8 +1,9 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from datetime import date, datetime
 from enum import Enum
 import hashlib
+import uuid
 
 class BudgetLevel(str, Enum):
     budget = "budget"
@@ -51,7 +52,14 @@ class TripHash(BaseModel):
 class TripCreate(BaseModel):
     userId: str
     formData: Dict[str, Any]
-    itinerary: Dict[str, Any]
+
+    @validator('formData')
+    def validate_form_data(cls, v):
+        required_fields = ['destination', 'startDate', 'endDate', 'travelType', 'adults']
+        for field in required_fields:
+            if field not in v or not v[field]:
+                raise ValueError(f"Missing required field: {field}")
+        return v
 
     class Config:
         json_schema_extra = {
@@ -60,11 +68,9 @@ class TripCreate(BaseModel):
                 "formData": {
                     "destination": "Paris",
                     "startDate": "2024-03-01",
-                    "endDate": "2024-03-07"
-                },
-                "itinerary": {
-                    "tripId": "will-be-replaced",
-                    "days": []
+                    "endDate": "2024-03-07",
+                    "travelType": "flight",
+                    "adults": 1
                 }
             }
         }
