@@ -6,7 +6,6 @@ import Itinerary from './components/Itinerary';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture, FaEdit, FaSave } from 'react-icons/fa';
-import { IoMdRefresh } from 'react-icons/io';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 import { saveTrip, updateTrip } from './services/tripService';
@@ -381,6 +380,29 @@ const App = () => {
     setHasUnsavedChanges(true);
   };
 
+  const handleTitleSave = async () => {
+    if (!itinerary || !editedTitle) return;
+    
+    try {
+      setIsSaving(true);
+      const newItinerary = {
+        ...itinerary,
+        title: editedTitle
+      };
+      
+      setItinerary(newItinerary);
+      setLocalItinerary(newItinerary);
+      setIsEditingTitle(false);
+      setHasUnsavedChanges(true);
+      toast.success('Title updated successfully');
+    } catch (error) {
+      console.error('Error saving title:', error);
+      toast.error('Failed to save title');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <Container fluid className="p-0 min-vh-100 d-flex flex-column">
       <Row className="g-0">
@@ -438,10 +460,7 @@ const App = () => {
                       <Button 
                         variant="outline-primary"
                         size="sm"
-                        onClick={() => {
-                          // Save logic here
-                          setIsEditingTitle(false);
-                        }}
+                        onClick={handleTitleSave}
                       >
                         <FaSave size={14} />
                       </Button>
@@ -499,15 +518,6 @@ const App = () => {
                         </small>
                       </div>
                     )}
-                    <Button 
-                      variant="outline-secondary"
-                      onClick={() => handleSubmit(formData!)}
-                      disabled={isLoading}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      <IoMdRefresh />
-                      Regenerate
-                    </Button>
                   </div>
                 </div>
                 <Itinerary 

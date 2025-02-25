@@ -9,7 +9,6 @@ export type EntertainmentPreference =
   | 'adventure'      // For thrill-seeking activities
   | 'educational'    // For museums, workshops, etc.
   | 'nightlife'
-  | 'hidden-gems'    // Add new option
   | 'must-see';      // Add new option
 
 export interface Stop {
@@ -29,6 +28,7 @@ export interface TripFormData {
   intermediateStops: Stop[];
   entertainmentPreferences: EntertainmentPreference[];
   budgetLevel: BudgetLevel;
+  budget: string;  // Keep this for now since it's used in the backend
   language: string;
 }
 

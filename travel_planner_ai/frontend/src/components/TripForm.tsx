@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip, Accordion } from 'react-bootstrap';
 import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel } from '../types';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 
@@ -21,8 +21,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     infants: 0,
     intermediateStops: [],
     entertainmentPreferences: [],
-    budget: 'mid-range',
     budgetLevel: 'mid-range',
+    budget: 'mid-range',
     language: 'en'
   });
 
@@ -226,54 +226,79 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
         </div>
       </Form.Group>
 
-      {/* Intermediate Stops */}
-      <Form.Group className="mb-3">
-        <Form.Label className="d-flex align-items-center">
-          Intermediate Stops
-          <OverlayTrigger
-            placement="top"
-            overlay={<Tooltip id="stops-tooltip">Add locations you want to visit during your trip</Tooltip>}
-          >
-            <span className="ms-2">
-              <FaInfoCircle className="text-secondary" size={14} />
-            </span>
-          </OverlayTrigger>
-        </Form.Label>
-        <div className="d-flex gap-2 mb-2">
-          <Form.Control
-            type="text"
-            value={newStop.destination}
-            onChange={(e) => setNewStop({ ...newStop, destination: e.target.value })}
-            placeholder="City/Location"
-            className="flex-grow-1 shadow-sm"
-          />
-          <Form.Control
-            type="number"
-            min="1"
-            value={newStop.days}
-            onChange={(e) => setNewStop({ ...newStop, days: parseInt(e.target.value) })}
-            placeholder="Days"
-            className="shadow-sm"
-            style={{ width: '70px' }}
-          />
-          <Button 
-            onClick={addIntermediateStop} 
-            variant="outline-primary" 
-            className="shadow-sm d-flex align-items-center justify-content-center"
-            style={{ width: '36px', height: '36px', padding: 0 }}
-          >
-            <FaPlus size={12} />
-          </Button>
-        </div>
-        <div className="d-flex flex-wrap gap-2">
-          {formData.intermediateStops.map((stop: Stop, index: number) => (
-            <Badge key={index} bg="secondary" className="d-flex align-items-center p-2">
-              {stop.destination} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
-              <Button variant="link" className="p-0 ms-2 text-light" onClick={() => removeStop(index)}>×</Button>
-            </Badge>
-          ))}
-        </div>
-      </Form.Group>
+      {/* Advanced Settings Panel */}
+      <Accordion className="mb-3">
+        <Accordion.Item eventKey="0">
+          <Accordion.Header>Advanced Settings</Accordion.Header>
+          <Accordion.Body>
+            {/* Intermediate Stops */}
+            <Form.Group className="mb-3">
+              <Form.Label className="d-flex align-items-center">
+                Intermediate Stops
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip id="stops-tooltip">Add locations you want to visit during your trip</Tooltip>}
+                >
+                  <span className="ms-2">
+                    <FaInfoCircle className="text-secondary" size={14} />
+                  </span>
+                </OverlayTrigger>
+              </Form.Label>
+              <div className="d-flex gap-2 mb-2">
+                <Form.Control
+                  type="text"
+                  value={newStop.destination}
+                  onChange={(e) => setNewStop({ ...newStop, destination: e.target.value })}
+                  placeholder="City/Location"
+                  className="flex-grow-1 shadow-sm"
+                />
+                <Form.Control
+                  type="number"
+                  min="1"
+                  value={newStop.days}
+                  onChange={(e) => setNewStop({ ...newStop, days: parseInt(e.target.value) })}
+                  placeholder="Days"
+                  className="shadow-sm"
+                  style={{ width: '70px' }}
+                />
+                <Button 
+                  onClick={addIntermediateStop} 
+                  variant="outline-primary" 
+                  className="shadow-sm d-flex align-items-center justify-content-center"
+                  style={{ width: '36px', height: '36px', padding: 0 }}
+                >
+                  <FaPlus size={12} />
+                </Button>
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {formData.intermediateStops.map((stop: Stop, index: number) => (
+                  <Badge key={index} bg="secondary" className="d-flex align-items-center p-2">
+                    {stop.destination} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
+                    <Button variant="link" className="p-0 ms-2 text-light" onClick={() => removeStop(index)}>×</Button>
+                  </Badge>
+                ))}
+              </div>
+            </Form.Group>
+
+            {/* Budget Level */}
+            <Form.Group className="mb-3">
+              <Form.Label>Budget Level</Form.Label>
+              <div className="d-flex gap-2">
+                {['budget', 'mid-range', 'luxury'].map((level) => (
+                  <Button
+                    key={level}
+                    variant={formData.budgetLevel === level ? 'primary' : 'outline-primary'}
+                    onClick={() => handleBudgetLevelChange(level as BudgetLevel)}
+                    className="text-capitalize"
+                  >
+                    {level}
+                  </Button>
+                ))}
+              </div>
+            </Form.Group>
+          </Accordion.Body>
+        </Accordion.Item>
+      </Accordion>
 
       {/* Entertainment Preferences */}
       <Form.Group className="mb-3">
@@ -288,7 +313,6 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
             'adventure',
             'educational',
             'nightlife',
-            'hidden-gems',
             'must-see'
           ].map((pref) => (
             <Button
@@ -299,22 +323,6 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
               className="text-capitalize"
             >
               {pref.replace('-', ' ')}
-            </Button>
-          ))}
-        </div>
-      </Form.Group>
-
-      {/* Budget Level */}
-      <Form.Group className="mb-3">
-        <Form.Label>Budget Level</Form.Label>
-        <div className="d-flex gap-2">
-          {(['budget', 'mid-range', 'luxury'] as BudgetLevel[]).map((level) => (
-            <Button
-              key={level}
-              variant={formData.budgetLevel === level ? 'success' : 'outline-success'}
-              onClick={() => handleBudgetLevelChange(level)}
-            >
-              {level}
             </Button>
           ))}
         </div>

@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import date, datetime
 from enum import Enum
 import hashlib
@@ -53,7 +53,7 @@ class TripCreate(BaseModel):
     userId: str
     formData: Dict[str, Any]
 
-    @validator('formData')
+    @field_validator('formData')
     def validate_form_data(cls, v):
         required_fields = ['destination', 'startDate', 'endDate', 'travelType', 'adults']
         for field in required_fields:
@@ -61,8 +61,8 @@ class TripCreate(BaseModel):
                 raise ValueError(f"Missing required field: {field}")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "userId": "123",
                 "formData": {
@@ -74,6 +74,7 @@ class TripCreate(BaseModel):
                 }
             }
         }
+    )
 
 class TripRequest(BaseModel):
     trip_details: TripDetails
