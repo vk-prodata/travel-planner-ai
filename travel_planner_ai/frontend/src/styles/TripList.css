@@ -1,0 +1,46 @@
+.trip-list-container {
+  padding-bottom: 40px;
+}
+
+.trip-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.trip-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.travel-type-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5rem;
+  opacity: 0.5;
+}
+
+.trip-dates {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.trip-details {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Animation for new trips */
+@keyframes highlightNew {
+  0% {
+    background-color: rgba(52, 152, 219, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.trip-card.new {
+  animation: highlightNew 2s ease-out;
+} 

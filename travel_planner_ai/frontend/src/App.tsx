@@ -1,17 +1,19 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import TripForm from './components/TripForm';
 import Itinerary from './components/Itinerary';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaPlaneDeparture, FaEdit, FaSave } from 'react-icons/fa';
+import { FaPlaneDeparture, FaEdit, FaSave, FaList } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
-import { saveTrip, updateTrip } from './services/tripService';
+import { saveTrip, updateTrip, getUserTrips } from './services/tripService';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import TripList from './pages/TripList';
 
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
@@ -47,8 +49,11 @@ const SignInPrompt: React.FC = () => (
   </div>
 );
 
-const App = () => {
+const MainApp = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
   const [formData, setFormData] = useState<TripFormData | null>(null);
@@ -58,6 +63,50 @@ const App = () => {
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localItinerary, setLocalItinerary] = useState<TripItinerary | null>(null);
+
+  // Load trip if tripId is in URL
+  useEffect(() => {
+    const tripId = searchParams.get('tripId');
+    if (tripId && user) {
+      const loadTrip = async () => {
+        setIsLoading(true);
+        try {
+          // Direct API call to get a specific trip instead of filtering from all trips
+          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/trips/${tripId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+            credentials: 'include',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to load trip: ${response.statusText}`);
+          }
+          
+          const trip = await response.json();
+          
+          if (trip) {
+            setFormData(trip.formData);
+            setItinerary(trip.itinerary);
+            setLocalItinerary(trip.itinerary);
+            setCurrentTripId(trip.id);
+            setHasUnsavedChanges(false);
+            toast.success('Trip loaded successfully!');
+          } else {
+            toast.error('Trip not found');
+          }
+        } catch (error) {
+          console.error('Error loading trip:', error);
+          toast.error('Failed to load trip');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      loadTrip();
+    }
+  }, [searchParams, user]);
 
   const handleSubmit = async (data: TripFormData) => {
     setIsLoading(true);
@@ -236,7 +285,7 @@ const App = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/generate-itinerary', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/generate-itinerary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -304,7 +353,7 @@ const App = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/refresh-activity', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/refresh-activity`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -419,14 +468,24 @@ const App = () => {
                 ) : (
                   <div className="d-flex align-items-center gap-2">
                     <UserAvatar name={user.name} />
-                    <Button 
-                      variant="outline-danger" 
-                      size="sm" 
-                      onClick={signOut}
-                      className="rounded-pill"
-                    >
-                      Sign Out
-                    </Button>
+                    <div className="d-flex">
+                      <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        onClick={() => navigate('/trips')}
+                        className="rounded-pill me-2"
+                      >
+                        <FaList className="me-1" /> My Trips
+                      </Button>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm" 
+                        onClick={signOut}
+                        className="rounded-pill"
+                      >
+                        Sign Out
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -559,6 +618,17 @@ const App = () => {
         }}
       />
     </Container>
+  );
+};
+
+const App = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/trips" element={<TripList />} />
+      </Routes>
+    </Router>
   );
 };
 

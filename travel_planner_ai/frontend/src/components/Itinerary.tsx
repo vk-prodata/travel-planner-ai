@@ -37,7 +37,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
 
   const handleDeleteActivity = async (dayIndex: number, activityIndex: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/activities/${dayIndex}/${activityIndex}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/activities/${dayIndex}/${activityIndex}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

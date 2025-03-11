@@ -26,7 +26,7 @@ export const saveTrip = async (tripData: {
       destination: tripData.formData.destination,
     });
 
-    const response = await fetch(`${API_URL}/api/trips`, {
+    const response = await fetch(`${API_URL}/trips`, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -82,7 +82,7 @@ export const updateTrip = async (
     });
 
     const headers = getAuthHeaders();
-    const response = await fetch(`${API_URL}/api/trips/${tripId}`, {
+    const response = await fetch(`${API_URL}/trips/${tripId}`, {
       method: 'PUT',
       headers,
       credentials: 'include',
@@ -121,12 +121,13 @@ export const updateTrip = async (
 
 export const getUserTrips = async (userId: string) => {
   try {
-    const response = await fetch(`${API_URL}/api/trips/user/${userId}`, {
+    const response = await fetch(`${API_URL}/trips`, {
       headers: getAuthHeaders(),
       credentials: 'include',
     });
 
     if (!response.ok) {
+      console.error(`Failed to fetch trips: ${response.status} ${response.statusText}`);
       throw new Error(`Failed to fetch trips: ${response.statusText}`);
     }
 

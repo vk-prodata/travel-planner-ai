@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from travel_planner_ai.backend.routes import router as trip_router
+from travel_planner_ai.backend.routers.trips import router as trips_router
 from .config.logging_config import setup_logging
 
 app = FastAPI(title="Travel Planner AI")
@@ -16,7 +17,9 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-app.include_router(trip_router, prefix="/api")
+# Include routers without prefixes to match frontend expectations
+app.include_router(trip_router)  # No prefix for routes to match frontend calls
+app.include_router(trips_router)  # No prefix since it already includes "/trips" in routes
 
 # Setup logging at application startup
 setup_logging()
