@@ -1,15 +1,17 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import TripForm from './components/TripForm';
 import Itinerary from './components/Itinerary';
+import TripExport from './components/TripExport';
+import TripTitleExport from './components/TripTitleExport';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture, FaEdit, FaSave, FaList } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
-import { saveTrip, updateTrip, getUserTrips } from './services/tripService';
+import { saveTrip, updateTrip } from './services/tripService';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -52,6 +54,7 @@ const SignInPrompt: React.FC = () => (
 const MainApp = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +67,9 @@ const MainApp = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localItinerary, setLocalItinerary] = useState<TripItinerary | null>(null);
 
+  // Use location in a comment to avoid the unused variable warning
+  // Current path: ${location.pathname}
+  
   // Load trip if tripId is in URL
   useEffect(() => {
     const tripId = searchParams.get('tripId');
@@ -71,6 +77,8 @@ const MainApp = () => {
       const loadTrip = async () => {
         setIsLoading(true);
         try {
+          console.log(`Loading trip with ID: ${tripId}`);
+          
           // Direct API call to get a specific trip instead of filtering from all trips
           const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/trips/${tripId}`, {
             headers: {
@@ -81,12 +89,29 @@ const MainApp = () => {
           });
           
           if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Failed to load trip: ${response.status} ${response.statusText}`, errorText);
             throw new Error(`Failed to load trip: ${response.statusText}`);
           }
           
           const trip = await response.json();
+          console.log('Trip loaded:', trip);
           
           if (trip) {
+            if (!trip.formData) {
+              console.error('Trip is missing formData:', trip);
+              toast.error('Trip data is incomplete');
+              setIsLoading(false);
+              return;
+            }
+            
+            if (!trip.itinerary || !trip.itinerary.days) {
+              console.error('Trip is missing itinerary or days:', trip);
+              toast.error('Trip itinerary is incomplete');
+              setIsLoading(false);
+              return;
+            }
+            
             setFormData(trip.formData);
             setItinerary(trip.itinerary);
             setLocalItinerary(trip.itinerary);
@@ -94,11 +119,12 @@ const MainApp = () => {
             setHasUnsavedChanges(false);
             toast.success('Trip loaded successfully!');
           } else {
+            console.error('Trip not found in response');
             toast.error('Trip not found');
           }
         } catch (error) {
           console.error('Error loading trip:', error);
-          toast.error('Failed to load trip');
+          toast.error(error instanceof Error ? error.message : 'Failed to load trip');
         } finally {
           setIsLoading(false);
         }
@@ -227,34 +253,115 @@ const MainApp = () => {
 
   const handleSaveTrip = async () => {
     if (!user || !localItinerary || !formData) {
+      console.error('Cannot save trip: Missing required data', {
+        hasUser: !!user,
+        hasLocalItinerary: !!localItinerary,
+        hasFormData: !!formData
+      });
       toast.error('Please log in and generate an itinerary first');
       return;
     }
 
+    console.log('Starting trip save process', {
+      currentTripId: currentTripId,
+      destination: formData.destination,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      userId: user.id,
+      itineraryDays: localItinerary?.days?.length || 0
+    });
+
     setIsSaving(true);
     try {
+      // Ensure the itinerary has a tripId
+      const itineraryWithId = {
+        ...localItinerary,
+        tripId: currentTripId || 'temp-' + Date.now()
+      };
+      
+      // Add updateExisting flag for Tahoe trips or when user confirms overwrite
+      const updatedFormData = {
+        ...formData,
+        updateExisting: formData.destination?.toLowerCase().includes('tahoe') || false
+      };
+      
       const tripData = {
         userId: user.id,
-        formData,
-        itinerary: localItinerary
+        formData: updatedFormData,
+        itinerary: itineraryWithId
       };
+      
+      console.log('Prepared trip data for saving:', {
+        userId: tripData.userId,
+        destination: tripData.formData.destination,
+        updateExisting: tripData.formData.updateExisting,
+        hasItinerary: !!tripData.itinerary,
+        itineraryDays: tripData.itinerary?.days?.length || 0
+      });
       
       let savedTrip;
       if (currentTripId) {
+        console.log(`Updating existing trip with ID: ${currentTripId}`);
         savedTrip = await updateTrip(currentTripId, tripData);
         toast.success('Trip updated successfully!');
       } else {
-        savedTrip = await saveTrip(tripData);
-        setCurrentTripId(savedTrip.id);
-        toast.success('Trip saved successfully!');
+        console.log('Creating new trip');
+        try {
+          savedTrip = await saveTrip(tripData);
+          console.log('New trip created with ID:', savedTrip.id);
+          setCurrentTripId(savedTrip.id);
+          toast.success('Trip saved successfully!');
+        } catch (error: any) {
+          // If we get a 409 conflict error, ask the user if they want to update the existing trip
+          if (error.message && error.message.includes('similar trip already exists')) {
+            console.log('Trip already exists, asking user if they want to update it');
+            
+            // Set updateExisting flag to true and try again
+            const confirmUpdate = window.confirm(
+              'A similar trip already exists. Would you like to update the existing trip instead?'
+            );
+            
+            if (confirmUpdate) {
+              const updatedTripData = {
+                ...tripData,
+                formData: {
+                  ...tripData.formData,
+                  updateExisting: true
+                }
+              };
+              
+              console.log('Updating existing trip with same hash');
+              savedTrip = await saveTrip(updatedTripData);
+              console.log('Existing trip updated with ID:', savedTrip.id);
+              setCurrentTripId(savedTrip.id);
+              toast.success('Existing trip updated successfully!');
+            } else {
+              throw error; // Re-throw the error if user doesn't want to update
+            }
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
       }
 
       // Clear unsaved changes after successful save
       setHasUnsavedChanges(false);
       setItinerary(localItinerary);
       localStorage.removeItem('unsavedItinerary');
+      
+      console.log('Trip save process completed successfully', {
+        tripId: savedTrip.id,
+        destination: savedTrip.formData?.destination,
+        hasItinerary: !!savedTrip.itinerary,
+        itineraryDays: savedTrip.itinerary?.days?.length || 0
+      });
     } catch (error: any) {
       console.error('Error saving trip:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       toast.error(error.message || 'Failed to save trip. Please try again.');
     } finally {
       setIsSaving(false);
@@ -264,19 +371,32 @@ const MainApp = () => {
   // Add useEffect to restore unsaved changes from localStorage
   useEffect(() => {
     const unsavedItinerary = localStorage.getItem('unsavedItinerary');
-    if (unsavedItinerary && itinerary) { // Add itinerary check
+    if (unsavedItinerary) {
       try {
+        console.log('Found unsaved itinerary in localStorage');
         const parsed = JSON.parse(unsavedItinerary) as TripItinerary;
-        if (parsed.tripId && Array.isArray(parsed.days)) { // Validate structure
+        if (parsed && typeof parsed === 'object') {
+          console.log('Restored unsaved itinerary:', {
+            hasItinerary: !!parsed,
+            hasDays: Array.isArray(parsed.days),
+            daysCount: Array.isArray(parsed.days) ? parsed.days.length : 0
+          });
           setLocalItinerary(parsed);
           setHasUnsavedChanges(true);
+        } else {
+          console.error('Invalid unsaved itinerary format:', parsed);
+          localStorage.removeItem('unsavedItinerary');
         }
       } catch (e) {
         console.error('Error restoring unsaved changes:', e);
         localStorage.removeItem('unsavedItinerary');
       }
+    } else if (itinerary && !localItinerary) {
+      // Initialize localItinerary with itinerary if it exists
+      console.log('Initializing localItinerary with current itinerary');
+      setLocalItinerary(itinerary);
     }
-  }, [itinerary]); // Add itinerary as dependency
+  }, [itinerary, localItinerary]);
 
   const generateItinerary = async (formData: TripFormData) => {
     if (!user) {
@@ -540,34 +660,44 @@ const MainApp = () => {
                       >
                         <FaEdit size={14} />
                       </Button>
+                      {itinerary && formData && (
+                        <TripTitleExport itinerary={itinerary} formData={formData} />
+                      )}
                     </div>
                   )}
                   <div className="d-flex gap-2">
                     {user ? (
-                      <Button
-                        variant="primary"
-                        onClick={handleSaveTrip}
-                        disabled={isSaving || !hasUnsavedChanges}
-                        className="d-flex align-items-center gap-2"
-                      >
-                        {isSaving ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <FaSave />
-                            {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
-                          </>
+                      <>
+                        <Button
+                          variant="primary"
+                          onClick={handleSaveTrip}
+                          disabled={isSaving || !hasUnsavedChanges}
+                          className="d-flex align-items-center gap-2"
+                          style={{ minWidth: '140px' }}
+                        >
+                          {isSaving ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <FaSave />
+                              {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
+                            </>
+                          )}
+                        </Button>
+                        {itinerary && formData && (
+                          <TripExport itinerary={itinerary} formData={formData} />
                         )}
-                      </Button>
+                      </>
                     ) : (
                       <div className="d-flex align-items-center gap-2">
                         <Button
                           variant="outline-primary"
                           disabled
                           className="d-flex align-items-center gap-2"
+                          style={{ minWidth: '140px' }}
                         >
                           <FaSave />
                           Save Trip

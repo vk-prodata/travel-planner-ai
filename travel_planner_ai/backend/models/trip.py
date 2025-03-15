@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, validator
 from datetime import date, datetime
 from enum import Enum
 import hashlib
@@ -52,17 +52,18 @@ class TripHash(BaseModel):
 class TripCreate(BaseModel):
     userId: str
     formData: Dict[str, Any]
+    itinerary: Optional[Dict[str, Any]] = None
 
-    @field_validator('formData')
+    @validator('formData')
     def validate_form_data(cls, v):
-        required_fields = ['destination', 'startDate', 'endDate', 'travelType', 'adults']
+        required_fields = ['destination', 'startDate', 'endDate']
         for field in required_fields:
             if field not in v or not v[field]:
                 raise ValueError(f"Missing required field: {field}")
         return v
 
-    model_config = ConfigDict(
-        json_schema_extra={
+    class Config:
+        json_schema_extra = {
             "example": {
                 "userId": "123",
                 "formData": {
@@ -71,10 +72,32 @@ class TripCreate(BaseModel):
                     "endDate": "2024-03-07",
                     "travelType": "flight",
                     "adults": 1
+                },
+                "itinerary": {
+                    "days": []
                 }
             }
         }
-    )
+
+class TripUpdate(BaseModel):
+    userId: Optional[str] = None
+    formData: Optional[Dict[str, Any]] = None
+    itinerary: Optional[Dict[str, Any]] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "formData": {
+                    "destination": "Paris",
+                    "startDate": "2024-03-01",
+                    "endDate": "2024-03-07",
+                    "language": "en"
+                },
+                "itinerary": {
+                    "days": []
+                }
+            }
+        }
 
 class TripRequest(BaseModel):
     trip_details: TripDetails

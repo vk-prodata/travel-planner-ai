@@ -143,11 +143,12 @@ class BaseAIClient:
 
         RULES:
         1. Start activities no earlier than 9:00 AM
-        2. End activities no later than 6:00 PM
-        3. Include lunch breaks between 12:00 PM and 2:00 PM
-        4. Each activity should be 1-3 hours long
+        2. End activities no later than 7:00 PM
+        3. Include lunch breaks between 12:00 PM and 2:00 PM. Suggest 2-3 specific places based on the requirements and take into account location of activities before and after lunch break.
+        4. Each activity should be 1-3 hours long. If activity assumes a tour/entartainment, be more specific and share 2-3 most popular companies to choose from and why we can choose them.
         5. Use the EXACT format shown above
-        6. Include 3-4 activities per day
+        6. Include 3-6 activities per day
+        7. If you need to drive more than 3 hours between activities, suggest an 15-30 minute break/activity/sightseeing.
         """
 
     def _parse_itinerary_response(self, response_text: str) -> Dict[str, Any]:

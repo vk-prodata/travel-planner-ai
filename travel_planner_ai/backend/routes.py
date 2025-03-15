@@ -44,6 +44,19 @@ async def create_trip(
     db = Depends(get_db)
 ):
     try:
+        logger.info(f"""
+        Starting trip creation process:
+        - User: {current_user['email']} (ID: {current_user['id']})
+        - Destination: {trip.formData.get('destination')}
+        - Date Range: {trip.formData.get('startDate')} to {trip.formData.get('endDate')}
+        - Has Itinerary: {bool(trip.itinerary)}
+        - Itinerary Days: {len(trip.itinerary.get('days', []))}
+        """)
+        
+        # Normalize destination name (lowercase, strip whitespace)
+        destination = trip.formData.get('destination', '')
+        trip.formData['destination'] = destination.strip()
+        
         # Generate trip hash
         trip_hash = TripHash(
             userId=current_user['id'],
@@ -52,14 +65,51 @@ async def create_trip(
             startDate=trip.formData['startDate'],
             endDate=trip.formData['endDate']
         ).generate_hash()
+        
+        logger.info(f"Generated trip hash: {trip_hash}")
 
         # Check if trip with this hash exists
         existing_trip = db.trips_collection.find_one({"trip_hash": trip_hash})
         if existing_trip:
-            raise HTTPException(
-                status_code=409,
-                detail="A similar trip already exists"
-            )
+            logger.warning(f"Trip with hash {trip_hash} already exists (ID: {existing_trip.get('id')})")
+            
+            # Check if the user wants to update the existing trip
+            update_existing = trip.formData.get('updateExisting', False)
+            
+            if update_existing:
+                logger.info(f"Updating existing trip instead of creating new one")
+                
+                # Update the existing trip
+                trip_dict = trip.dict()
+                trip_dict.pop('userId', None)  # Remove old userId field
+                
+                # Keep the original ID and created_at
+                trip_id = existing_trip['id']
+                if 'tripId' in trip_dict.get('itinerary', {}):
+                    trip_dict['itinerary']['tripId'] = trip_id
+                
+                # Update the trip
+                db.trips_collection.update_one(
+                    {"_id": ObjectId(existing_trip['_id'])},
+                    {"$set": {
+                        "formData": trip_dict['formData'],
+                        "itinerary": trip_dict['itinerary'],
+                        "updated_at": datetime.now()
+                    }}
+                )
+                
+                # Return the updated trip
+                updated_trip = db.trips_collection.find_one({"_id": ObjectId(existing_trip['_id'])})
+                if updated_trip:
+                    updated_trip["_id"] = str(updated_trip["_id"])
+                    logger.info(f"Successfully updated trip with ID: {trip_id}")
+                    return updated_trip
+            else:
+                # For all trips, return the conflict error
+                raise HTTPException(
+                    status_code=409,
+                    detail="A similar trip already exists"
+                )
 
         # Create trip with hash
         trip_dict = trip.dict()
@@ -81,12 +131,18 @@ async def create_trip(
         logger.info(f"""
         Creating new trip:
         - Trip ID: {trip_id}
-        - User: {current_user['email']}
+        - User: {current_user['email']} (ID: {current_user['id']})
         - Destination: {trip_dict.get('formData', {}).get('destination')}
         - Created at: {trip_dict['created_at']}
+        - Itinerary structure: {list(trip_dict.get('itinerary', {}).keys())}
+        - Itinerary days: {len(trip_dict.get('itinerary', {}).get('days', []))}
         """)
         
+        # Log the full trip data for debugging
+        logger.debug(f"Full trip data: {json.dumps(trip_dict, default=str)}")
+        
         result = db.trips_collection.insert_one(trip_dict)
+        logger.info(f"MongoDB insert result: {result.inserted_id}")
         
         created_trip = db.trips_collection.find_one({"_id": result.inserted_id})
         if created_trip:
@@ -94,11 +150,15 @@ async def create_trip(
             logger.info(f"Successfully created trip with ID: {trip_id}")
             return created_trip
         else:
+            logger.error(f"Trip not found after creation with ID: {trip_id}")
             raise HTTPException(status_code=404, detail="Trip not found after creation")
             
+    except HTTPException as he:
+        logger.error(f"HTTP exception in create_trip: {he.detail}")
+        raise
     except Exception as e:
-        logger.error(f"Error creating trip: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating trip: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error creating trip: {str(e)}")
 
 @router.get("/trips/user/{user_id}", response_model=list[TripResponse])
 async def get_user_trips(
@@ -111,13 +171,21 @@ async def get_user_trips(
     
     try:
         trips = list(db.trips_collection.find({"user_id": user_id}))
-        return [
-            {
-                **trip,
-                "id": str(trip["_id"]),
-                "_id": str(trip["_id"])
-            } for trip in trips
-        ]
+        
+        # Ensure all trips have the required fields for TripResponse
+        formatted_trips = []
+        for trip in trips:
+            # Convert ObjectId to string
+            trip["id"] = str(trip["_id"])
+            trip["_id"] = str(trip["_id"])
+            
+            # Ensure itinerary field exists
+            if "itinerary" not in trip:
+                trip["itinerary"] = {"tripId": trip["id"], "days": []}
+                
+            formatted_trips.append(trip)
+            
+        return formatted_trips
     except Exception as e:
         logger.error(f"Error fetching trips: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -282,6 +350,9 @@ async def refresh_activity(
         logger.info(f"Refreshing activity for user {current_user.get('email')}")
         logger.debug(f"Request data: {request}")
         
+        activity_type = request.activity.get('type', 'activity').lower()
+        is_meal = activity_type == 'meal' or activity_type == 'food'
+        
         # Generate a new activity using AI
         prompt = f"""
         Generate a new activity to replace:
@@ -290,8 +361,10 @@ async def refresh_activity(
         IMPORTANT: Use this EXACT format:
         [ACTIVITY_START]
         Time: {request.activity.get('time')}
-        Type: {request.activity.get('type', 'activity')}
+        Type: {activity_type}
         Description: (new activity description)
+        Location: (specific place name)
+        Coordinates: (latitude,longitude if available)
         [ACTIVITY_END]
 
         Rules:
@@ -299,6 +372,15 @@ async def refresh_activity(
         2. Keep similar type of activity
         3. Make it family-friendly and engaging
         4. Include specific details and locations
+        5. For the Location field, provide the exact name of the place (restaurant, museum, park, etc.)
+        6. For the Coordinates field, provide the latitude and longitude if available, otherwise leave it blank
+        """
+        
+        # Add specific instructions for meal activities
+        if is_meal:
+            prompt += """
+        7. For meal activities, provide 2-3 specific restaurant options with brief descriptions
+           Format the description like this: "Options include: 1. Restaurant Name - Brief description of cuisine and ambiance. 2. Restaurant Name - Brief description."
         """
         
         try:
@@ -308,7 +390,7 @@ async def refresh_activity(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided."
+                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided. For meal activities, always suggest 2-3 specific restaurant options with brief descriptions."
                     },
                     {
                         "role": "user",
@@ -326,7 +408,7 @@ async def refresh_activity(
             new_activity = {
                 'id': request.activity.get('id'),
                 'time': request.activity.get('time'),
-                'type': request.activity.get('type', 'activity')
+                'type': activity_type
             }
             
             for line in lines:
@@ -336,6 +418,12 @@ async def refresh_activity(
                     new_activity['type'] = line.replace('Type: ', '').strip().lower()
                 elif line.startswith('Description: '):
                     new_activity['description'] = line.replace('Description: ', '').strip()
+                elif line.startswith('Location: '):
+                    new_activity['location'] = line.replace('Location: ', '').strip()
+                elif line.startswith('Coordinates: '):
+                    coordinates = line.replace('Coordinates: ', '').strip()
+                    if coordinates and coordinates != '(latitude,longitude if available)':
+                        new_activity['coordinates'] = coordinates
             
             if not new_activity.get('description'):
                 raise ValueError("No description generated for new activity")

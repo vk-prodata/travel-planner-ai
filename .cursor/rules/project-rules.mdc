@@ -1,0 +1,46 @@
+---
+description: General Project Rules
+globs: *
+alwaysApply: false
+---
+
+# Your rule content
+
+- "Always refer to instructions.md file for the context about the current feature that I'm implementing"
+- "If I ask you to implement a feature always present an overview of its planned implementation before generating any code and add code below"
+- "Write 1-2 integration tests before implementing features"
+- "Always start each response with a random animal emoji (e.g., 🦊, 🦉, 🦡)."
+- "Always update memory.md after each session with progress or decisions made."
+- "Implement tests for all new features. Tests should be straightforward and easy to maintain."
+- "Don't downgrade python version"
+
+ignore:
+  - node_modules/
+  - .git/
+  - dist/
+  - build/
+  - coverage/
+  - *.log
+  - .env
+  - .env.*
+  - venv/
+  - .venv/
+  - poetry.lock
+
+include:
+  - travel_planner_ai/**
+  - frontend/**
+  - docs/**
+  - *.md
+
+debugStatements:
+  - "[DEBUG]"
+  - "[INFO]"
+  - "[ERROR]"
+  - "[CACHE]"
+  - "[AI-CALL]"
+
+selfImprovement:
+  - "Agent may append new rules or clarifications here after coding sessions."
+  - "User must approve changes before finalizing in version control."
+

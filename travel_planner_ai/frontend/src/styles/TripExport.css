@@ -1,0 +1,85 @@
+.share-dropdown-menu {
+  min-width: 200px;
+}
+
+.share-dropdown-menu .dropdown-item {
+  padding: 0.5rem 1rem;
+}
+
+.share-dropdown-menu .d-flex {
+  justify-content: space-around;
+}
+
+.share-button {
+  transition: transform 0.2s ease;
+}
+
+.share-button:hover {
+  transform: scale(1.1);
+}
+
+.export-button {
+  min-width: 120px;
+}
+
+.export-button svg,
+.share-button svg {
+  margin-right: 0.5rem;
+}
+
+.copy-button {
+  min-width: 100px;
+}
+
+.copy-button:hover {
+  background-color: #6c757d;
+  color: white;
+}
+
+/* Animation for copy success */
+@keyframes copySuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.copy-success {
+  animation: copySuccess 0.3s ease;
+}
+
+/* Title export icons */
+.title-export-buttons {
+  margin-left: 10px;
+}
+
+.title-export-icon {
+  color: #6c757d;
+  margin: 0 3px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.title-export-icon:hover {
+  color: #0d6efd;
+  transform: scale(1.2);
+}
+
+/* Share icon buttons */
+.share-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.share-icon-button:hover {
+  transform: scale(1.1);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.share-icon-button:focus {
+  box-shadow: none;
+} 

@@ -1,9 +1,10 @@
 import * as React from 'react';
-import { Card, Button } from 'react-bootstrap';
+import { Card, Button, Alert } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
-import { BsArrowRepeat, BsCheck, BsX, BsTrash } from 'react-icons/bs';
+import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt } from 'react-icons/bs';
 import { useState } from 'react';
 import { toast } from 'react-toastify';
+import '../styles/Itinerary.css';
 
 interface ItineraryProps {
   itinerary: TripItinerary;
@@ -55,6 +56,56 @@ const Itinerary: React.FC<ItineraryProps> = ({
     }
   };
 
+  // Function to get Google Maps URL from coordinates
+  const getGoogleMapsUrl = (coordinates: string) => {
+    return `https://www.google.com/maps/search/?api=1&query=${coordinates}`;
+  };
+
+  // Function to format meal descriptions to highlight restaurant options
+  const formatMealDescription = (description: string) => {
+    // Check if the description contains restaurant options
+    if (description.includes(':')) {
+      const parts = description.split(':');
+      const intro = parts[0];
+      const options = parts.slice(1).join(':');
+      
+      // Try to identify restaurant options
+      const restaurantRegex = /([\w\s'&-]+)(?:\s*-\s*|\s*–\s*)(.*?)(?=\s*\d+\.|$)/g;
+      let formattedOptions = options;
+      
+      // If we can identify restaurant options with descriptions, format them
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const testMatch = restaurantRegex.exec(options);
+      if (testMatch !== null) {
+        restaurantRegex.lastIndex = 0; // Reset regex
+        formattedOptions = options.replace(restaurantRegex, (match, restaurant, description) => {
+          return `<div class="restaurant-option">
+                    <strong>${restaurant.trim()}</strong> - ${description.trim()}
+                  </div>`;
+        });
+        
+        return (
+          <div>
+            <p>{intro}:</p>
+            <div className="restaurant-options" dangerouslySetInnerHTML={{ __html: formattedOptions }} />
+          </div>
+        );
+      }
+    }
+    
+    // Default return if no special formatting is needed
+    return <p>{description}</p>;
+  };
+
+  // Check if itinerary or itinerary.days is undefined
+  if (!itinerary || !itinerary.days) {
+    return (
+      <Alert variant="warning">
+        This trip has an invalid itinerary format. Please try generating a new itinerary.
+      </Alert>
+    );
+  }
+
   return (
     <div className="itinerary">
       {itinerary.days.map((day, dayIndex) => (
@@ -65,6 +116,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
               const activityKey = `${dayIndex}-${activityIndex}`;
               const suggestion = altSuggestions[activityKey];
               const isRefreshing = refreshingActivities[activityKey];
+              const isMeal = activity.type === 'meal' || activity.type === 'food';
 
               return (
                 <Card key={activity.id} className="mb-2 shadow-sm">
@@ -73,7 +125,31 @@ const Itinerary: React.FC<ItineraryProps> = ({
                       <div className="activity-content flex-grow-1">
                         <div className="activity-time fw-bold">{activity.time}</div>
                         <div className="activity-description">
-                          {activity.description}
+                          {isMeal 
+                            ? formatMealDescription(activity.description)
+                            : activity.description
+                          }
+                          
+                          {activity.location && (
+                            <div className="activity-location mt-2">
+                              <span className="text-muted">
+                                <BsGeoAlt className="me-1" />
+                                {activity.location}
+                              </span>
+                              
+                              {activity.coordinates && (
+                                <a 
+                                  href={getGoogleMapsUrl(activity.coordinates)} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="ms-2 text-primary"
+                                >
+                                  View on Map
+                                </a>
+                              )}
+                            </div>
+                          )}
+                          
                           {suggestion && (
                             <div className="mt-2 p-2 bg-light rounded">
                               <div className="text-muted small mb-1">Suggested alternative:</div>
@@ -118,7 +194,9 @@ const Itinerary: React.FC<ItineraryProps> = ({
                           )}
                         </div>
                         <div className="activity-type mt-2">
-                          <span className="badge bg-light text-primary">{activity.type}</span>
+                          <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
+                            {activity.type}
+                          </span>
                         </div>
                       </div>
                       <div className="d-flex gap-2">
@@ -154,4 +232,4 @@ const Itinerary: React.FC<ItineraryProps> = ({
   );
 };
 
-export default Itinerary; 
+export default Itinerary;

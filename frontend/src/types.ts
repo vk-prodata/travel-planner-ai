@@ -20,8 +20,6 @@ export interface Activity {
   time: string;
   description: string;
   type: string;
-  location?: string;
-  coordinates?: string;
 }
 
 export interface Day {

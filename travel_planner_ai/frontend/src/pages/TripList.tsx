@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Alert, Navbar, Nav } from 'react-bootstrap';
-import { FaTrash, FaEye, FaPlane, FaTrain, FaCar, FaBus, FaShip, FaHome, FaArrowLeft } from 'react-icons/fa';
+import { Container, Row, Col, Card, Button, Spinner, Alert, Navbar } from 'react-bootstrap';
+import { FaTrash, FaEye, FaPlane, FaTrain, FaCar, FaBus, FaShip, FaArrowLeft, FaClock } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserTrips } from '../services/tripService';
-import { format } from 'date-fns';
+import { format, formatDistance } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import '../styles/TripList.css';
 
@@ -135,6 +135,17 @@ const TripList: React.FC = () => {
     }
   };
 
+  const formatUpdatedTime = (dateString?: string) => {
+    if (!dateString) return 'Never updated';
+    
+    try {
+      const date = new Date(dateString);
+      return formatDistance(date, new Date(), { addSuffix: true });
+    } catch (e) {
+      return 'Unknown';
+    }
+  };
+
   if (!user) {
     return (
       <>
@@ -215,6 +226,15 @@ const TripList: React.FC = () => {
                       <div>Travelers: {trip.formData.adults + (trip.formData.children || 0) + (trip.formData.infants || 0)}</div>
                       <div>Budget: {trip.formData.budget}</div>
                     </div>
+                    
+                    {/* Last Updated Information */}
+                    {trip.updated_at && (
+                      <div className="trip-updated-info text-muted small mb-3 d-flex align-items-center">
+                        <FaClock className="me-1" />
+                        Updated: {formatUpdatedTime(trip.updated_at)}
+                      </div>
+                    )}
+                    
                     <div className="d-flex justify-content-between mt-auto">
                       <Button 
                         variant="outline-danger" 
