@@ -247,36 +247,86 @@ def create_fallback_itinerary(trip_data):
     days = (end_date - start_date).days + 1
     itinerary = {"days": []}
     
+    # Process intermediate stops if available
+    intermediate_stops = {}
+    if trip_data.get('intermediateStops'):
+        for stop in trip_data.get('intermediateStops'):
+            if stop.get('startDate') and stop.get('days') and stop.get('destination'):
+                stop_date = datetime.strptime(stop.get('startDate'), '%Y-%m-%d')
+                stop_days = int(stop.get('days'))
+                
+                # Create a dictionary of dates to stop information
+                for i in range(stop_days):
+                    current_date = (stop_date + timedelta(days=i)).strftime('%Y-%m-%d')
+                    intermediate_stops[current_date] = stop.get('destination')
+    
     for day in range(days):
         current_date = start_date + timedelta(days=day)
+        current_date_str = current_date.strftime('%Y-%m-%d')
+        
+        # Check if this day is at an intermediate stop
+        location = trip_data.get('destination')
+        is_intermediate_stop = False
+        
+        if current_date_str in intermediate_stops:
+            location = intermediate_stops[current_date_str]
+            is_intermediate_stop = True
+        
+        day_activities = []
+        
+        # If it's the first day and there's an origin, add travel activity
+        if day == 0 and trip_data.get('origin'):
+            day_activities.append({
+                "id": str(uuid.uuid4()),
+                "time": "09:00 AM",
+                "description": f"Travel from {trip_data.get('origin')} to {location}",
+                "type": "travel"
+            })
+        
+        # If it's an intermediate stop's first day, add arrival activity
+        elif is_intermediate_stop and current_date_str == datetime.strptime(
+            next((s.get('startDate') for s in trip_data.get('intermediateStops', []) 
+                 if s.get('destination') == location), 
+                current_date_str), 
+            '%Y-%m-%d').strftime('%Y-%m-%d'):
+            day_activities.append({
+                "id": str(uuid.uuid4()),
+                "time": "09:00 AM",
+                "description": f"Arrive at {location}",
+                "type": "travel"
+            })
+        
+        # Add standard activities
+        day_activities.extend([
+            {
+                "id": str(uuid.uuid4()),
+                "time": "10:00 AM",
+                "description": f"Explore {location} attractions",
+                "type": "activity"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "time": "12:00 PM",
+                "description": f"Lunch at a local restaurant in {location}",
+                "type": "meal"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "time": "03:00 PM",
+                "description": f"Visit a museum or park in {location}",
+                "type": "activity"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "time": "07:00 PM",
+                "description": f"Dinner at a recommended restaurant in {location}",
+                "type": "meal"
+            }
+        ])
+        
         itinerary["days"].append({
-            "date": current_date.strftime('%Y-%m-%d'),
-            "activities": [
-                {
-                    "id": str(uuid.uuid4()),
-                    "time": "09:00 AM",
-                    "description": "Explore local attractions",
-                    "type": "activity"
-                },
-                {
-                    "id": str(uuid.uuid4()),
-                    "time": "12:00 PM",
-                    "description": "Lunch at a local restaurant",
-                    "type": "meal"
-                },
-                {
-                    "id": str(uuid.uuid4()),
-                    "time": "03:00 PM",
-                    "description": "Visit a museum or park",
-                    "type": "activity"
-                },
-                {
-                    "id": str(uuid.uuid4()),
-                    "time": "07:00 PM",
-                    "description": "Dinner at a recommended restaurant",
-                    "type": "meal"
-                }
-            ]
+            "date": current_date_str,
+            "activities": day_activities
         })
     
     return itinerary

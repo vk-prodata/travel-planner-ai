@@ -36,6 +36,7 @@ export interface TripItinerary {
 
 export interface Stop {
   destination: string;
+  startDate: string;
   days: number;
 }
 

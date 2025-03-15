@@ -110,46 +110,63 @@ class BaseAIClient:
             raise
 
     def _build_itinerary_prompt(self, args: Dict[str, Any]) -> str:
+        # Format intermediate stops if they exist
+        intermediate_stops_text = ""
+        if args.get('intermediateStops') and len(args.get('intermediateStops')) > 0:
+            stops = []
+            for stop in args.get('intermediateStops'):
+                stop_text = f"{stop.get('destination')} (arrival: {stop.get('startDate')}, stay: {stop.get('days')} days)"
+                stops.append(stop_text)
+            intermediate_stops_text = (
+                f"- Intermediate Stops: {', '.join(stops)}. "
+                "The first Intermediate stop is the first destination."
+            )
+
         return f"""
-        Create a detailed travel itinerary with the following requirements:
-        - From: {args.get('origin')}
-        - To: {args.get('destination')}
-        - Dates: {args.get('startDate')} to {args.get('endDate')}
-        - Activities Time: from 9 AM to 6 PM
-        - Travel Type: {args.get('travelType')}
-        - Number of travelers: {args.get('adults')} adults, {args.get('children')} children, {args.get('infants')} infants
-        - Budget Level: {args.get('budgetLevel')}
-        - Entertainment Preferences: {', '.join(args.get('entertainmentPreferences', []))}
+    Create a detailed travel itinerary with the following requirements:
+    - From: {args.get('origin')}
+    - To: {args.get('destination')}
+    - Dates: {args.get('startDate')} to {args.get('endDate')}
+    - Activities Time: from 9 AM to 6 PM
+    - Travel Type: {args.get('travelType')}
+    - Number of travelers: {args.get('adults')} adults, {args.get('children')} children, {args.get('infants')} infants
+    - Budget Level: {args.get('budgetLevel')}
+    - Entertainment Preferences: {', '.join(args.get('entertainmentPreferences', []))}
+    {intermediate_stops_text}
 
-        IMPORTANT: Use this EXACT format for each activity:
-        [DAY_START]
-        Date: YYYY-MM-DD
-        [ACTIVITY_START]
-        Time: HH:MM AM/PM - HH:MM AM/PM
-        Type: travel|food|activity|sightseeing|accommodation
-        Description: Detailed activity description
-        [ACTIVITY_END]
-        [DAY_END]
+    IMPORTANT: Use this EXACT format for each activity:
+    [DAY_START]
+    Date: YYYY-MM-DD
+    [ACTIVITY_START]
+    Time: HH:MM AM/PM - HH:MM AM/PM
+    Type: travel|food|activity|sightseeing|accommodation
+    Description: Detailed activity description
+    [ACTIVITY_END]
+    [DAY_END]
 
-        Example:
-        [DAY_START]
-        Date: 2025-02-22
-        [ACTIVITY_START]
-        Time: 9:00 AM - 10:30 AM
-        Type: activity
-        Description: Visit the local museum
-        [ACTIVITY_END]
-        [DAY_END]
+    Example:
+    [DAY_START]
+    Date: 2025-02-22
+    [ACTIVITY_START]
+    Time: 9:00 AM - 10:30 AM
+    Type: activity
+    Description: Visit the local museum
+    [ACTIVITY_END]
+    [DAY_END]
 
-        RULES:
-        1. Start activities no earlier than 9:00 AM
-        2. End activities no later than 7:00 PM
-        3. Include lunch breaks between 12:00 PM and 2:00 PM. Suggest 2-3 specific places based on the requirements and take into account location of activities before and after lunch break.
-        4. Each activity should be 1-3 hours long. If activity assumes a tour/entartainment, be more specific and share 2-3 most popular companies to choose from and why we can choose them.
-        5. Use the EXACT format shown above
-        6. Include 3-6 activities per day
-        7. If you need to drive more than 3 hours between activities, suggest an 15-30 minute break/activity/sightseeing.
-        """
+    RULES:
+    1. Start activities no earlier than 9:00 AM
+    2. End activities no later than 7:00 PM
+    3. Include lunch breaks between 12:00 PM and 2:00 PM. Suggest 2-3 specific places based on the requirements and take into account the location of activities before and after lunch break.
+    4. Each activity should be 1-3 hours long. If the activity involves a tour/entertainment, be more specific and share 2-3 of the most popular companies to choose from, including why they might be chosen.
+    5. Use the EXACT format shown above (DAY_START, ACTIVITY_START, etc.).
+    6. Include 3-6 activities per day.
+    7. If you need to drive more than 3 hours between activities, suggest a 15-30 minute break/activity/sightseeing.
+    8. If intermediate stops are specified, make sure to include them in the itinerary on the specified dates with appropriate activities.
+
+    Remember to follow all formatting rules above and incorporate the breakdown by date/city.
+    """
+
 
     def _parse_itinerary_response(self, response_text: str) -> Dict[str, Any]:
         """Parse the AI response into a structured itinerary format"""

@@ -26,18 +26,45 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     language: 'en'
   });
 
-  const [newStop, setNewStop] = useState<Stop>({ destination: '', days: 1 });
+  const [newStop, setNewStop] = useState<Stop>({ 
+    destination: '', 
+    startDate: '', 
+    days: 1 
+  });
 
   const [dateError, setDateError] = useState<string | null>(null);
+  const [stopError, setStopError] = useState<string | null>(null);
 
   const addIntermediateStop = () => {
-    if (newStop.destination) {
-      setFormData({
-        ...formData,
-        intermediateStops: [...formData.intermediateStops, newStop]
-      });
-      setNewStop({ destination: '', days: 1 });
+    if (!newStop.destination) {
+      setStopError('Please enter a destination');
+      return;
     }
+    
+    if (!newStop.startDate) {
+      setStopError('Please select a start date');
+      return;
+    }
+    
+    // Validate that stop dates are within trip dates
+    const stopStart = new Date(newStop.startDate);
+    const stopEnd = new Date(newStop.startDate);
+    stopEnd.setDate(stopEnd.getDate() + newStop.days - 1); // -1 because the start day counts as day 1
+    
+    const tripStart = new Date(formData.startDate);
+    const tripEnd = new Date(formData.endDate);
+    
+    if (stopStart < tripStart || stopEnd > tripEnd) {
+      setStopError('Stop dates must be within trip dates');
+      return;
+    }
+    
+    setFormData({
+      ...formData,
+      intermediateStops: [...formData.intermediateStops, newStop]
+    });
+    setNewStop({ destination: '', startDate: '', days: 1 });
+    setStopError(null);
   };
 
   const removeStop = (index: number) => {
@@ -76,6 +103,20 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     
     setDateError(null);
     onSubmit(formData);
+  };
+
+  // Calculate the maximum allowed days for an intermediate stop based on selected start date
+  const calculateMaxDays = (): number => {
+    if (!newStop.startDate || !formData.endDate) return 1;
+    
+    const stopStart = new Date(newStop.startDate);
+    const tripEnd = new Date(formData.endDate);
+    
+    // Calculate days difference (including the start day)
+    const diffTime = tripEnd.getTime() - stopStart.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    return Math.max(1, diffDays);
   };
 
   return (
@@ -302,11 +343,32 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                   placeholder="City/Location"
                   className="flex-grow-1 shadow-sm"
                 />
+                <div className="d-flex flex-column" style={{ width: '140px' }}>
+                  <Form.Control
+                    type="date"
+                    value={newStop.startDate}
+                    min={formData.startDate}
+                    max={formData.endDate ? new Date(new Date(formData.endDate).setDate(new Date(formData.endDate).getDate() - (newStop.days - 1))).toISOString().split('T')[0] : undefined}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      setNewStop({ ...newStop, startDate: newStartDate });
+                      setStopError(null);
+                    }}
+                    placeholder="Start Date"
+                    className="shadow-sm"
+                    disabled={!formData.startDate || !formData.endDate}
+                  />
+                </div>
                 <Form.Control
                   type="number"
                   min="1"
+                  max={calculateMaxDays()}
                   value={newStop.days}
-                  onChange={(e) => setNewStop({ ...newStop, days: parseInt(e.target.value) })}
+                  onChange={(e) => {
+                    const days = parseInt(e.target.value);
+                    setNewStop({ ...newStop, days });
+                    setStopError(null);
+                  }}
                   placeholder="Days"
                   className="shadow-sm"
                   style={{ width: '70px' }}
@@ -316,14 +378,18 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                   variant="outline-primary" 
                   className="shadow-sm d-flex align-items-center justify-content-center"
                   style={{ width: '36px', height: '36px', padding: 0 }}
+                  disabled={!formData.startDate || !formData.endDate}
                 >
                   <FaPlus size={12} />
                 </Button>
               </div>
+              {stopError && (
+                <div className="text-danger mb-2 small">{stopError}</div>
+              )}
               <div className="d-flex flex-wrap gap-2">
                 {formData.intermediateStops.map((stop: Stop, index: number) => (
                   <Badge key={index} bg="secondary" className="d-flex align-items-center p-2">
-                    {stop.destination} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
+                    {stop.destination} {stop.startDate && new Date(stop.startDate).toLocaleDateString()} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
                     <Button variant="link" className="p-0 ms-2 text-light" onClick={() => removeStop(index)}>×</Button>
                   </Badge>
                 ))}

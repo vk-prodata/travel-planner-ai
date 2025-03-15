@@ -13,6 +13,7 @@ export type EntertainmentPreference =
 
 export interface Stop {
   destination: string;
+  startDate: string;
   days: number;
 }
 
