@@ -156,9 +156,6 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
               }}
               required
             />
-            <Form.Text className="text-muted">
-              When your trip begins
-            </Form.Text>
           </Form.Group>
         </Col>
         <Col md={6}>
@@ -185,9 +182,6 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
             <Form.Control.Feedback type="invalid">
               {dateError}
             </Form.Control.Feedback>
-            <Form.Text className="text-muted">
-              Must be after start date
-            </Form.Text>
           </Form.Group>
         </Col>
       </Row>
