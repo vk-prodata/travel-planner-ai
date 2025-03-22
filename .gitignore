@@ -113,3 +113,5 @@ logs/
 .env
 instructions.md
 .cursorrules
+memory.md
+.cursor/
