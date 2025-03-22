@@ -76,8 +76,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: userInfo.email
       });
 
-      // Store the token
+      // Store the token and user email
       localStorage.setItem('token', response.credential);
+      localStorage.setItem('userEmail', userInfo.email);
     } catch (error) {
       console.error('Error handling credential:', error);
     }
@@ -121,6 +122,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: userInfo.email
             });
             
+            // Store the user email in localStorage
+            localStorage.setItem('userEmail', userInfo.email);
+            
             resolve();
           } catch (error) {
             console.error('Error during sign in:', error);
@@ -141,11 +145,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return new Promise((resolve) => {
         window.google.accounts.oauth2.revoke(user?.email || '', () => {
           setUser(null);
+          // Remove user data from localStorage
+          localStorage.removeItem('token');
+          localStorage.removeItem('userEmail');
           resolve();
         });
       });
     } else {
       setUser(null);
+      // Remove user data from localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('userEmail');
       return Promise.resolve();
     }
   };

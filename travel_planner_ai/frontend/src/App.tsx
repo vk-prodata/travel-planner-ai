@@ -16,6 +16,8 @@ import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import TripList from './pages/TripList';
+import LoggingToggle from './components/LoggingToggle';
+import { notifyError, notifySuccess } from './services/errorService';
 
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
@@ -100,14 +102,14 @@ const MainApp = () => {
           if (trip) {
             if (!trip.formData) {
               console.error('Trip is missing formData:', trip);
-              toast.error('Trip data is incomplete');
+              notifyError('Trip data is incomplete', user?.email);
               setIsLoading(false);
               return;
             }
             
             if (!trip.itinerary || !trip.itinerary.days) {
               console.error('Trip is missing itinerary or days:', trip);
-              toast.error('Trip itinerary is incomplete');
+              notifyError('Trip itinerary is incomplete', user?.email);
               setIsLoading(false);
               return;
             }
@@ -117,14 +119,14 @@ const MainApp = () => {
             setLocalItinerary(trip.itinerary);
             setCurrentTripId(trip.id);
             setHasUnsavedChanges(false);
-            toast.success('Trip loaded successfully!');
+            notifySuccess('Trip loaded successfully!');
           } else {
             console.error('Trip not found in response');
-            toast.error('Trip not found');
+            notifyError('Trip not found', user?.email);
           }
         } catch (error) {
           console.error('Error loading trip:', error);
-          toast.error(error instanceof Error ? error.message : 'Failed to load trip');
+          notifyError(error instanceof Error ? error.message : 'Failed to load trip', user?.email);
         } finally {
           setIsLoading(false);
         }
@@ -194,11 +196,11 @@ const MainApp = () => {
         setItinerary(newItinerary);
         setLocalItinerary(newItinerary);
         setHasUnsavedChanges(true);
-        toast.success('Trip generated successfully!');
+        notifySuccess('Trip generated successfully!');
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to generate itinerary');
+      notifyError(error instanceof Error ? error.message : 'Failed to generate itinerary', null);
     } finally {
       setIsLoading(false);
     }
@@ -258,7 +260,7 @@ const MainApp = () => {
         hasLocalItinerary: !!localItinerary,
         hasFormData: !!formData
       });
-      toast.error('Please log in and generate an itinerary first');
+      notifyError('Please log in and generate an itinerary first', user?.email);
       return;
     }
 
@@ -303,14 +305,14 @@ const MainApp = () => {
       if (currentTripId) {
         console.log(`Updating existing trip with ID: ${currentTripId}`);
         savedTrip = await updateTrip(currentTripId, tripData);
-        toast.success('Trip updated successfully!');
+        notifySuccess('Trip updated successfully!');
       } else {
         console.log('Creating new trip');
         try {
           savedTrip = await saveTrip(tripData);
           console.log('New trip created with ID:', savedTrip.id);
           setCurrentTripId(savedTrip.id);
-          toast.success('Trip saved successfully!');
+          notifySuccess('Trip saved successfully!');
         } catch (error: any) {
           // If we get a 409 conflict error, ask the user if they want to update the existing trip
           if (error.message && error.message.includes('similar trip already exists')) {
@@ -334,7 +336,7 @@ const MainApp = () => {
               savedTrip = await saveTrip(updatedTripData);
               console.log('Existing trip updated with ID:', savedTrip.id);
               setCurrentTripId(savedTrip.id);
-              toast.success('Existing trip updated successfully!');
+              notifySuccess('Existing trip updated successfully!');
             } else {
               throw error; // Re-throw the error if user doesn't want to update
             }
@@ -362,7 +364,7 @@ const MainApp = () => {
         stack: error.stack,
         name: error.name
       });
-      toast.error(error.message || 'Failed to save trip. Please try again.');
+      notifyError(error.message || 'Failed to save trip. Please try again.', user?.email);
     } finally {
       setIsSaving(false);
     }
@@ -400,7 +402,7 @@ const MainApp = () => {
 
   const generateItinerary = async (formData: TripFormData) => {
     if (!user) {
-      toast.error('Please sign in to generate an itinerary');
+      notifyError('Please sign in to generate an itinerary', null);
       return null;
     }
 
@@ -461,14 +463,14 @@ const MainApp = () => {
         user: user.email,
         formData
       });
-      toast.error(`Dear ${user.email}, there was an error: ${errorMsg}`);
+      notifyError(`Dear ${user.email}, there was an error: ${errorMsg}`, user?.email);
       throw error;
     }
   };
 
   const refreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity) => {
     if (!user || !formData) {
-      toast.error('Please sign in to refresh activities');
+      notifyError('Please sign in to refresh activities', user?.email);
       return;
     }
 
@@ -517,13 +519,13 @@ const MainApp = () => {
         setLocalItinerary(newItinerary);
         setHasUnsavedChanges(true);
         
-        toast.success('Activity refreshed successfully!');
+        notifySuccess('Activity refreshed successfully!');
       } else {
         throw new Error('Invalid response format');
       }
     } catch (error) {
       console.error('Error refreshing activity:', error);
-      toast.error('Failed to refresh activity. Please try again.');
+      notifyError('Failed to refresh activity. Please try again.', user?.email);
       throw error;
     }
   };
@@ -563,10 +565,10 @@ const MainApp = () => {
       setLocalItinerary(newItinerary);
       setIsEditingTitle(false);
       setHasUnsavedChanges(true);
-      toast.success('Title updated successfully');
+      notifySuccess('Title updated successfully');
     } catch (error) {
       console.error('Error saving title:', error);
-      toast.error('Failed to save title');
+      notifyError('Failed to save title', user?.email);
     } finally {
       setIsSaving(false);
     }
@@ -578,16 +580,16 @@ const MainApp = () => {
         <Col md={4} className="border-end shadow-sm" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
           <div className="p-2">
             <div className="bg-light p-2 rounded shadow-sm">
-              <div className="d-flex align-items-center justify-content-between mb-2">
+              <div className="d-flex justify-content-between align-items-center mb-4">
                 <div className="d-flex align-items-center">
                   <FaPlaneDeparture className="me-2 text-secondary" size={20} />
                   <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
                 </div>
-                {!user ? (
-                  <AuthForm />
-                ) : (
-                  <div className="d-flex align-items-center gap-2">
-                    <UserAvatar name={user.name} />
+                <div className="d-flex align-items-center">
+                  <LoggingToggle />
+                  {!user ? (
+                    <AuthForm />
+                  ) : (
                     <div className="d-flex">
                       <Button 
                         variant="outline-primary" 
@@ -606,8 +608,8 @@ const MainApp = () => {
                         Sign Out
                       </Button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
               {!user && <SignInPrompt />}

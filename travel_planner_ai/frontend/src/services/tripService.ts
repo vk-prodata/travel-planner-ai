@@ -1,4 +1,5 @@
 import { TripItinerary, TripFormData } from '../types';
+import { notifyError } from './errorService';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -88,6 +89,8 @@ export const saveTrip = async (tripData: {
     return savedTrip;
   } catch (error) {
     console.error('Error saving trip:', error);
+    const userEmail = localStorage.getItem('userEmail');
+    notifyError(error, userEmail);
     throw error;
   }
 };
@@ -159,11 +162,13 @@ export const updateTrip = async (
     return updatedTrip;
   } catch (error) {
     console.error('Error updating trip:', error);
+    const userEmail = localStorage.getItem('userEmail');
+    notifyError(error, userEmail);
     throw error;
   }
 };
 
-export const getUserTrips = async (userId: string) => {
+export const getUserTrips = async (userId: string): Promise<any[]> => {
   try {
     const response = await fetch(`${API_URL}/trips/user/${userId}`, {
       headers: getAuthHeaders(),
@@ -177,7 +182,9 @@ export const getUserTrips = async (userId: string) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error fetching user trips:', error);
+    console.error('Error fetching trips:', error);
+    const userEmail = localStorage.getItem('userEmail');
+    notifyError(error, userEmail);
     throw error;
   }
 }; 

@@ -6,6 +6,8 @@ import { getUserTrips } from '../services/tripService';
 import { format, formatDistance } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import '../styles/TripList.css';
+import { notifyError, notifySuccess } from '../services/errorService';
+import LoggingToggle from '../components/LoggingToggle';
 
 // Define Trip interface based on API response
 interface Trip {
@@ -49,7 +51,9 @@ const TripList: React.FC = () => {
         setTrips(fetchedTrips);
       } catch (err) {
         console.error('Failed to fetch trips:', err);
-        setError('Failed to load your trips. Please try again later.');
+        const errorMessage = 'Failed to load your trips. Please try again later.';
+        setError(errorMessage);
+        notifyError(err, user?.email);
       } finally {
         setLoading(false);
       }
@@ -68,7 +72,9 @@ const TripList: React.FC = () => {
         })
         .catch(err => {
           console.error('Failed to fetch trips on retry:', err);
-          setError('Failed to load your trips. Please try again later.');
+          const errorMessage = 'Failed to load your trips. Please try again later.';
+          setError(errorMessage);
+          notifyError(err, user?.email);
         })
         .finally(() => {
           setLoading(false);
@@ -100,9 +106,12 @@ const TripList: React.FC = () => {
         // Remove trip from state after successful deletion
         setTrips(trips.filter(trip => trip.id !== tripId));
         setDeleteConfirm(null);
+        notifySuccess('Trip deleted successfully');
       } catch (err) {
         console.error('Error deleting trip:', err);
-        setError('Failed to delete trip. Please try again.');
+        const errorMessage = 'Failed to delete trip. Please try again.';
+        setError(errorMessage);
+        notifyError(err, user?.email);
       }
     } else {
       // Set this trip for delete confirmation
@@ -154,9 +163,12 @@ const TripList: React.FC = () => {
             <FaPlane className="me-2" />
             Travel Planner AI
           </Navbar.Brand>
-          <Button variant="outline-primary" size="sm" onClick={() => navigate('/')}>
-            <FaArrowLeft className="me-1" /> Back to Planner
-          </Button>
+          <div className="d-flex align-items-center">
+            <LoggingToggle />
+            <Button variant="outline-primary" size="sm" onClick={() => navigate('/')} className="ms-2">
+              <FaArrowLeft className="me-1" /> Back to Planner
+            </Button>
+          </div>
         </Navbar>
         <Container className="mt-5">
           <Alert variant="info">
@@ -174,9 +186,12 @@ const TripList: React.FC = () => {
           <FaPlane className="me-2" />
           Travel Planner AI
         </Navbar.Brand>
-        <Button variant="outline-primary" size="sm" onClick={() => navigate('/')}>
-          <FaArrowLeft className="me-1" /> Back to Planner
-        </Button>
+        <div className="d-flex align-items-center">
+          <LoggingToggle />
+          <Button variant="outline-primary" size="sm" onClick={() => navigate('/')} className="ms-2">
+            <FaArrowLeft className="me-1" /> Back to Planner
+          </Button>
+        </div>
       </Navbar>
       
       <Container className="trip-list-container mt-4">
