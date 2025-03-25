@@ -2,6 +2,7 @@
 name = "travel-planner-ai"
 version = "0.1.0"
 description = "Travel Planner AI using FastAPI, GPT-4o, and React"
+authors = ["Vitalii Kudriavtcev <vkusa87@gmail.com>"]
 packages = [
     { include = "travel_planner_ai" }
 ]
