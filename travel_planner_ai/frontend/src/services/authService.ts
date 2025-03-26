@@ -1,6 +1,6 @@
 import { User, LoginData, SignupData } from '../types';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export const authService = {
   async login(data: LoginData): Promise<User> {

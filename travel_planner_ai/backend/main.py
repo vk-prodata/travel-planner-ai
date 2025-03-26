@@ -15,10 +15,15 @@ logger.info("Starting Travel Planner AI application")
 
 app = FastAPI(title="Travel Planner AI")
 
-# Configure CORS for local development
+# Configure CORS for local development and production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3002"],  # React app URLs
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3002",
+        "https://www.travelplannerai.org",
+        "https://travelplannerai.org"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,6 +88,15 @@ async def add_secure_cookie_settings(request, call_next):
     if response.headers.get("set-cookie"):
         response.headers["set-cookie"] += "; SameSite=Strict; Secure"
     return response
+
+@app.get("/test")
+async def test():
+    logger.info("Test endpoint accessed")
+    return {
+        "status": "ok",
+        "message": "Backend is working",
+        "timestamp": time.time()
+    }
 
 @app.get("/")
 async def root():
