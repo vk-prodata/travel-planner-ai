@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip, Accordion } from 'react-bootstrap';
-import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel } from '../types';
+import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType } from '../types';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 
 interface TripFormProps {
@@ -23,7 +23,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     entertainmentPreferences: [],
     budgetLevel: 'mid-range',
     budget: 'mid-range',
-    language: 'en'
+    language: 'en',
+    cuisinePreference: 'any'
   });
 
   const [newStop, setNewStop] = useState<Stop>({ 
@@ -49,7 +50,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     // Validate that stop dates are within trip dates
     const stopStart = new Date(newStop.startDate);
     const stopEnd = new Date(newStop.startDate);
-    stopEnd.setDate(stopEnd.getDate() + newStop.days - 1); // -1 because the start day counts as day 1
+    stopEnd.setDate(stopEnd.getDate() + (newStop.days)- 1); //TODO Keep the start day in the range
     
     const tripStart = new Date(formData.startDate);
     const tripEnd = new Date(formData.endDate);
@@ -59,6 +60,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
       return;
     }
     
+    // Add the stop with the exact date selected
     setFormData({
       ...formData,
       intermediateStops: [...formData.intermediateStops, newStop]
@@ -348,7 +350,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                     type="date"
                     value={newStop.startDate}
                     min={formData.startDate}
-                    max={formData.endDate ? new Date(new Date(formData.endDate).setDate(new Date(formData.endDate).getDate() - (newStop.days - 1))).toISOString().split('T')[0] : undefined}
+                    max={formData.endDate}
                     onChange={(e) => {
                       const newStartDate = e.target.value;
                       setNewStop({ ...newStop, startDate: newStartDate });
@@ -411,6 +413,45 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                   </Button>
                 ))}
               </div>
+            </Form.Group>
+
+            {/* Cuisine Preference */}
+            <Form.Group className="mb-3">
+              <Form.Label className="d-flex align-items-center">
+                Café & Restaurant Preferences
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip id="cuisine-tooltip">Select your preferred type of cuisine for restaurant recommendations</Tooltip>}
+                >
+                  <span className="ms-2">
+                    <FaInfoCircle className="text-secondary" size={14} />
+                  </span>
+                </OverlayTrigger>
+              </Form.Label>
+              <Form.Select
+                className="shadow-sm"
+                value={formData.cuisinePreference}
+                onChange={(e) => setFormData({...formData, cuisinePreference: e.target.value as CuisineType})}
+              >
+                <option value="any">Any Cuisine</option>
+                <option value="local">Local/Traditional</option>
+                <option value="international">International</option>
+                <option value="vegetarian">Vegetarian</option>
+                <option value="vegan">Vegan</option>
+                <option value="halal">Halal</option>
+                <option value="kosher">Kosher</option>
+                <option value="seafood">Seafood</option>
+                <option value="mediterranean">Mediterranean</option>
+                <option value="asian">Asian</option>
+                <option value="european">European</option>
+                <option value="american">American</option>
+                <option value="mexican">Mexican</option>
+                <option value="japanese">Japanese</option>
+                <option value="italian">Italian</option>
+                <option value="slavic">Slavic</option>
+                <option value="indian">Indian</option>
+                <option value="thai">Thai</option>
+              </Form.Select>
             </Form.Group>
           </Accordion.Body>
         </Accordion.Item>

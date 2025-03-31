@@ -130,4 +130,52 @@ describe('TripForm Component', () => {
       expect(screen.getByText(/Stop dates must be within trip dates/i)).toBeInTheDocument();
     });
   });
+
+  test('cuisine preference selection works correctly', () => {
+    render(<TripForm onSubmit={mockOnSubmit} isLoading={false} />);
+    
+    // Open the advanced settings accordion
+    fireEvent.click(screen.getByText(/Advanced Settings/i));
+    
+    // Check if cuisine preference section exists
+    expect(screen.getByText(/Café & Restaurant Preferences/i)).toBeInTheDocument();
+    
+    // Find the select element
+    const cuisineSelect = screen.getByRole('combobox', { name: /café & restaurant preferences/i });
+    expect(cuisineSelect).toBeInTheDocument();
+    
+    // Check if default value is 'any'
+    expect(cuisineSelect).toHaveValue('any');
+    
+    // Change the value and verify
+    fireEvent.change(cuisineSelect, { target: { value: 'vegetarian' } });
+    expect(cuisineSelect).toHaveValue('vegetarian');
+  });
+
+  test('cuisine preference is included in form submission', async () => {
+    render(<TripForm onSubmit={mockOnSubmit} isLoading={false} />);
+    
+    // Fill in required fields
+    fireEvent.change(screen.getByLabelText(/From/i), { target: { value: 'New York' } });
+    fireEvent.change(screen.getByLabelText(/To/i), { target: { value: 'Paris' } });
+    fireEvent.change(screen.getByLabelText(/Start Date/i), { target: { value: '2024-07-01' } });
+    fireEvent.change(screen.getByLabelText(/End Date/i), { target: { value: '2024-07-10' } });
+    
+    // Open advanced settings and change cuisine preference
+    fireEvent.click(screen.getByText(/Advanced Settings/i));
+    const cuisineSelect = screen.getByRole('combobox', { name: /café & restaurant preferences/i });
+    fireEvent.change(cuisineSelect, { target: { value: 'mediterranean' } });
+    
+    // Submit the form
+    fireEvent.click(screen.getByText(/Plan My Trip/i));
+    
+    // Check if onSubmit was called with the correct cuisine preference
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cuisinePreference: 'mediterranean'
+        })
+      );
+    });
+  });
 }); 

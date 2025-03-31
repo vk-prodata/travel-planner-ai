@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Card, Button, Alert } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
 import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt } from 'react-icons/bs';
+import { FaDollarSign } from 'react-icons/fa';
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import '../styles/Itinerary.css';
@@ -57,8 +58,23 @@ const Itinerary: React.FC<ItineraryProps> = ({
   };
 
   // Function to get Google Maps URL from coordinates
-  const getGoogleMapsUrl = (coordinates: string) => {
-    return `https://www.google.com/maps/search/?api=1&query=${coordinates}`;
+  const getGoogleMapsUrl = (coordinates: string, location?: string) => {
+    if (!coordinates) return '#';
+    
+    // If location is available, use it for a more accurate search
+    const locationString = location || '';
+    const [placeName, city, state, country] = locationString.split(',').map((part: string) => part.trim());
+    
+    // Build the search query with available location details
+    let searchQuery = '';
+    if (placeName) searchQuery += placeName;
+    if (city) searchQuery += (searchQuery ? ', ' : '') + city;
+    if (state) searchQuery += (searchQuery ? ', ' : '') + state;
+    if (country) searchQuery += (searchQuery ? ', ' : '') + country;
+    
+    // If we have a formatted location, use it; otherwise, fall back to coordinates
+    const query = searchQuery || coordinates;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   };
 
   // Function to format meal descriptions to highlight restaurant options
@@ -97,6 +113,21 @@ const Itinerary: React.FC<ItineraryProps> = ({
     return <p>{description}</p>;
   };
 
+  const getPriceLevelDisplay = (priceLevel?: string) => {
+    switch (priceLevel) {
+      case 'free':
+        return <span className="badge bg-success">Free</span>;
+      case '$':
+        return <span className="badge bg-info">$</span>;
+      case '$$':
+        return <span className="badge bg-warning">$$</span>;
+      case '$$$':
+        return <span className="badge bg-danger">$$$</span>;
+      default:
+        return null;
+    }
+  };
+
   // Check if itinerary or itinerary.days is undefined
   if (!itinerary || !itinerary.days) {
     return (
@@ -123,7 +154,15 @@ const Itinerary: React.FC<ItineraryProps> = ({
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-start">
                       <div className="activity-content flex-grow-1">
-                        <div className="activity-time fw-bold">{activity.time}</div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div className="activity-time fw-bold">{activity.time}</div>
+                          <div className="d-flex gap-2 align-items-center">
+                            <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
+                              {activity.type}
+                            </span>
+                            {getPriceLevelDisplay(activity.priceLevel)}
+                          </div>
+                        </div>
                         <div className="activity-description">
                           {isMeal 
                             ? formatMealDescription(activity.description)
@@ -139,7 +178,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
                               
                               {activity.coordinates && (
                                 <a 
-                                  href={getGoogleMapsUrl(activity.coordinates)} 
+                                  href={getGoogleMapsUrl(activity.coordinates, activity.location)} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   className="ms-2 text-primary"
@@ -192,11 +231,6 @@ const Itinerary: React.FC<ItineraryProps> = ({
                               </div>
                             </div>
                           )}
-                        </div>
-                        <div className="activity-type mt-2">
-                          <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
-                            {activity.type}
-                          </span>
                         </div>
                       </div>
                       <div className="d-flex gap-2">

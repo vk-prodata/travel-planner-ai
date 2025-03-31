@@ -122,6 +122,19 @@ class BaseAIClient:
                 "The first Intermediate stop is the first destination."
             )
 
+        # Build cuisine instruction
+        cuisine_preference = args.get('cuisinePreference', 'any')
+        cuisine_instruction = ""
+        if cuisine_preference != 'any':
+            if cuisine_preference == 'local':
+                cuisine_instruction = "Focus on authentic local and traditional restaurants of the region. "
+            elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
+                cuisine_instruction = f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
+            elif cuisine_preference == 'international':
+                cuisine_instruction = "Suggest a diverse mix of international restaurants representing various world cuisines. "
+            elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai']:
+                cuisine_instruction = f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
+
         return f"""
     Create a detailed travel itinerary with the following requirements:
     - From: {args.get('origin')}
@@ -132,6 +145,7 @@ class BaseAIClient:
     - Number of travelers: {args.get('adults')} adults, {args.get('children')} children, {args.get('infants')} infants
     - Budget Level: {args.get('budgetLevel')}
     - Entertainment Preferences: {', '.join(args.get('entertainmentPreferences', []))}
+    - Cuisine Preference: {cuisine_preference}
     {intermediate_stops_text}
 
     IMPORTANT: Use this EXACT format for each activity:
@@ -141,6 +155,9 @@ class BaseAIClient:
     Time: HH:MM AM/PM - HH:MM AM/PM
     Type: travel|food|activity|sightseeing|accommodation
     Description: Detailed activity description
+    Price: free|$|$$|$$$
+    Location: Specific place name
+    Coordinates: latitude,longitude (if available)
     [ACTIVITY_END]
     [DAY_END]
 
@@ -151,18 +168,26 @@ class BaseAIClient:
     Time: 9:00 AM - 10:30 AM
     Type: activity
     Description: Visit the local museum
+    Price: $$
+    Location: City Museum
+    Coordinates: 12.345,-67.890
     [ACTIVITY_END]
     [DAY_END]
 
     RULES:
     1. Start activities no earlier than 9:00 AM
     2. End activities no later than 7:00 PM
-    3. Include lunch breaks between 12:00 PM and 2:00 PM. Suggest 2-3 specific places based on the requirements and take into account the location of activities before and after lunch break.
+    3. Include lunch breaks between 12:00 PM and 2:00 PM. {cuisine_instruction}Suggest 2-3 specific places based on the requirements and take into account the location of activities before and after lunch break.
     4. Each activity should be 1-3 hours long. If the activity involves a tour/entertainment, be more specific and share 2-3 of the most popular companies to choose from, including why they might be chosen.
     5. Use the EXACT format shown above (DAY_START, ACTIVITY_START, etc.).
     6. Include 3-6 activities per day.
     7. If you need to drive more than 3 hours between activities, suggest a 15-30 minute break/activity/sightseeing.
-    8. If intermediate stops are specified, make sure to include them in the itinerary on the specified dates with appropriate activities.
+    8. For intermediate stops, use the EXACT dates provided - do not modify them. Include appropriate activities for the specified duration at each stop.
+    9. Always include a price level for each activity:
+       - free: No cost (parks, walking tours, public spaces)
+       - $: Low cost (basic museums, casual dining)
+       - $$: Moderate cost (guided tours, mid-range restaurants)
+       - $$$: High cost (luxury experiences, fine dining)
 
     Remember to follow all formatting rules above and incorporate the breakdown by date/city.
     """
@@ -199,6 +224,12 @@ class BaseAIClient:
                     current_activity['type'] = line.replace('Type: ', '').strip().lower()
                 elif line.startswith('Description: '):
                     current_activity['description'] = line.replace('Description: ', '').strip()
+                elif line.startswith('Price: '):
+                    current_activity['priceLevel'] = line.replace('Price: ', '').strip()
+                elif line.startswith('Location: '):
+                    current_activity['location'] = line.replace('Location: ', '').strip()
+                elif line.startswith('Coordinates: '):
+                    current_activity['coordinates'] = line.replace('Coordinates: ', '').strip()
                 elif line == '[ACTIVITY_END]':
                     if current_activity and 'time' in current_activity and 'description' in current_activity:
                         current_activity['id'] = f"{current_day}-{len(current_activities)}"

@@ -14,8 +14,19 @@
 - Implemented loading states, empty states, and error handling
 - Added date-fns package for date formatting
 
+### Café & Restaurant Preferences Implementation - [Current Date]
+
+- Added cuisine type selection in the trip form's advanced settings
+- Implemented CuisineType enum with various cuisine options
+- Updated TripFormData interface to include cuisinePreference
+- Added comprehensive tests for the new feature
+- Cuisine preferences will be used to tailor restaurant recommendations in the itinerary
+
 ### Next Steps
 - Consider adding sorting options for trips (by date, destination, etc.)
 - Add filtering capabilities 
 - Implement pagination for users with many trips
 - Add trip search functionality 
+- Consider adding more specific cuisine types based on user feedback
+- Implement backend logic to incorporate cuisine preferences into AI-generated itineraries
+- Add cuisine filters to the trip list view 

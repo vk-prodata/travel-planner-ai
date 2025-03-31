@@ -22,6 +22,7 @@ export interface Activity {
   type: string;
   location?: string;
   coordinates?: string;
+  priceLevel?: PriceLevel;
 }
 
 export interface Day {
@@ -50,6 +51,26 @@ export type EntertainmentPreference =
   | 'shopping'
   | 'relaxation';
 
+export type CuisineType = 
+  | 'any'
+  | 'local'
+  | 'seafood'
+  | 'mediterranean'
+  | 'asian'
+  | 'european'
+  | 'american'
+  | 'mexican'
+  | 'japanese'
+  | 'italian'
+  | 'slavic'
+  | 'indian'
+  | 'thai'
+  | 'international'
+  | 'vegetarian'
+  | 'vegan'
+  | 'halal'
+  | 'kosher';
+
 export interface TripFormData {
   origin?: string;
   destination: string;
@@ -60,11 +81,12 @@ export interface TripFormData {
   children: number;
   infants: number;
   budget: string;
-  budgetLevel: 'budget' | 'mid-range' | 'luxury';
+  budgetLevel: BudgetLevel;
   language: string;
   entertainmentPreferences: EntertainmentPreference[];
   intermediateStops: Stop[];
   notes?: string;
+  cuisinePreference: CuisineType;
 }
 
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';
@@ -75,4 +97,6 @@ export interface TripHash {
   destination: string;
   startDate: string;
   endDate: string;
-} 
+}
+
+export type PriceLevel = 'free' | '$' | '$$' | '$$$'; 

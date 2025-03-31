@@ -49,7 +49,8 @@ def generate_cache_key(trip_request):
         "infants": trip_request.infants,
         "budgetLevel": trip_request.budgetLevel,
         "entertainmentPreferences": sorted(trip_request.entertainmentPreferences) if trip_request.entertainmentPreferences else [],
-        "intermediateStops": sorted(trip_request.intermediateStops) if trip_request.intermediateStops else []
+        "intermediateStops": sorted(trip_request.intermediateStops) if trip_request.intermediateStops else [],
+        "cuisinePreference": trip_request.cuisinePreference
     }
     
     # Convert to a stable string representation
@@ -123,6 +124,7 @@ def generate_ai_prompt(trip_data):
     budget_level = trip_data.get('budgetLevel', 'medium')
     preferences = trip_data.get('entertainmentPreferences', [])
     language = trip_data.get('language', 'en')
+    cuisine_preference = trip_data.get('cuisinePreference', 'any')
     
     # Map language codes to full language names for clearer instructions
     language_names = {
@@ -136,6 +138,18 @@ def generate_ai_prompt(trip_data):
     }
     
     language_name = language_names.get(language, 'English')
+
+    # Build cuisine instruction based on preference
+    cuisine_instruction = ""
+    if cuisine_preference != 'any':
+        if cuisine_preference == 'local':
+            cuisine_instruction = "Focus on authentic local and traditional restaurants of the region. "
+        elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
+            cuisine_instruction = f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
+        elif cuisine_preference == 'international':
+            cuisine_instruction = "Suggest a diverse mix of international restaurants representing various world cuisines. "
+        elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai']:
+            cuisine_instruction = f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
     
     # Build the prompt
     prompt = (
@@ -146,7 +160,8 @@ def generate_ai_prompt(trip_data):
         f"Budget level: {budget_level}. "
         f"Entertainment preferences: {', '.join(preferences)}. "
         f"\n\nIMPORTANT: The entire itinerary must be written in {language_name} language. "
-        f"For each meal suggestion, provide 2-3 specific restaurant names with a brief description of each. "
+        f"{cuisine_instruction}"
+        f"For each meal suggestion, provide 2-3 specific restaurant names with a brief description of each, including their signature dishes or specialties. "
         f"For each activity, include specific locations and venues rather than generic suggestions. "
         f"When possible, include the exact name of attractions, parks, museums, etc. "
         f"Format the response as a JSON object with the following structure:\n"
@@ -179,10 +194,32 @@ async def call_openai_api(prompt):
         language_match = re.search(r"in (\w+) language", prompt)
         language = language_match.group(1) if language_match else "English"
         
+        # Extract cuisine preference from prompt
+        cuisine_patterns = [
+            r"Focus on authentic local",
+            r"Only suggest (vegetarian|vegan|halal|kosher)",
+            r"Suggest a diverse mix of international",
+            r"Prioritize (seafood|mediterranean|asian|european|american|mexican|japanese|italian|slavic|indian|thai)"
+        ]
+        
+        cuisine_instruction = ""
+        for pattern in cuisine_patterns:
+            match = re.search(pattern, prompt)
+            if match:
+                if match.groups():
+                    cuisine_type = match.group(1)
+                    if cuisine_type in ['vegetarian', 'vegan', 'halal', 'kosher']:
+                        cuisine_instruction = f" Ensure all restaurant recommendations are certified {cuisine_type}."
+                    else:
+                        cuisine_instruction = f" Focus on authentic {cuisine_type} cuisine."
+                else:
+                    cuisine_instruction = " Focus on authentic local cuisine."
+                break
+        
         response = openai.ChatCompletion.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"You are an expert travel planner. Always provide specific restaurant names and activity locations rather than generic suggestions. Generate all content in {language} language as requested by the user."},
+                {"role": "system", "content": f"You are an expert travel planner and culinary guide with deep knowledge of global cuisines and restaurants. Always provide specific restaurant names and activity locations rather than generic suggestions.{cuisine_instruction} Include signature dishes and specialties when recommending restaurants. Generate all content in {language} language as requested by the user."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -243,6 +280,7 @@ def create_fallback_itinerary(trip_data):
     
     start_date = datetime.strptime(trip_data.get('startDate', '2023-01-01'), '%Y-%m-%d')
     end_date = datetime.strptime(trip_data.get('endDate', '2023-01-03'), '%Y-%m-%d')
+    cuisine_preference = trip_data.get('cuisinePreference', 'any')
     
     days = (end_date - start_date).days + 1
     itinerary = {"days": []}
@@ -259,6 +297,32 @@ def create_fallback_itinerary(trip_data):
                 for i in range(stop_days):
                     current_date = (stop_date + timedelta(days=i)).strftime('%Y-%m-%d')
                     intermediate_stops[current_date] = stop.get('destination')
+    
+    def get_meal_description(meal_type, location):
+        """Generate meal description based on cuisine preference"""
+        if cuisine_preference == 'any':
+            return f"{meal_type} at a local restaurant in {location}"
+        elif cuisine_preference == 'local':
+            return f"{meal_type} at a traditional local restaurant in {location}"
+        elif cuisine_preference == 'international':
+            return f"{meal_type} at an international cuisine restaurant in {location}"
+        elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
+            return f"{meal_type} at a certified {cuisine_preference} restaurant in {location}"
+        else:
+            cuisine_display = {
+                'seafood': 'fresh seafood',
+                'mediterranean': 'Mediterranean',
+                'asian': 'Asian',
+                'european': 'European',
+                'american': 'American',
+                'mexican': 'Mexican',
+                'japanese': 'Japanese',
+                'italian': 'Italian',
+                'slavic': 'Slavic',
+                'indian': 'Indian',
+                'thai': 'Thai'
+            }.get(cuisine_preference, cuisine_preference)
+            return f"{meal_type} at an authentic {cuisine_display} restaurant in {location}"
     
     for day in range(days):
         current_date = start_date + timedelta(days=day)
@@ -307,7 +371,7 @@ def create_fallback_itinerary(trip_data):
             {
                 "id": str(uuid.uuid4()),
                 "time": "12:00 PM",
-                "description": f"Lunch at a local restaurant in {location}",
+                "description": get_meal_description("Lunch", location),
                 "type": "meal"
             },
             {
@@ -319,7 +383,7 @@ def create_fallback_itinerary(trip_data):
             {
                 "id": str(uuid.uuid4()),
                 "time": "07:00 PM",
-                "description": f"Dinner at a recommended restaurant in {location}",
+                "description": get_meal_description("Dinner", location),
                 "type": "meal"
             }
         ])
