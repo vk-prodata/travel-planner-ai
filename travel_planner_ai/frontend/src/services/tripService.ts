@@ -1,4 +1,4 @@
-import { TripItinerary, TripFormData } from '../types';
+import { TripItinerary, TripFormData, SavedTrip } from '../types';
 import { notifyError } from './errorService';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -17,80 +17,35 @@ const getAuthHeaders = () => {
 };
 
 export const saveTrip = async (tripData: {
-  itinerary: TripItinerary;
-  formData: TripFormData;
   userId: string;
-}) => {
+  formData: TripFormData;
+  itinerary: TripItinerary;
+}): Promise<SavedTrip> => {
   try {
-    console.log('Saving trip with data:', {
-      userId: tripData.userId,
-      destination: tripData.formData.destination,
-      startDate: tripData.formData.startDate,
-      endDate: tripData.formData.endDate,
-      itineraryDays: tripData.itinerary?.days?.length || 0,
-      formDataKeys: Object.keys(tripData.formData),
-      itineraryKeys: Object.keys(tripData.itinerary || {})
-    });
-
-    // Validate itinerary before sending
-    if (!tripData.itinerary || !tripData.itinerary.days) {
-      console.error('Invalid itinerary structure:', tripData.itinerary);
-      throw new Error('Invalid itinerary structure. Please regenerate your itinerary.');
-    }
-
-    console.log('Request payload:', JSON.stringify(tripData, null, 2));
-
     const response = await fetch(`${API_URL}/trips`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
       credentials: 'include',
       body: JSON.stringify(tripData),
     });
 
-    console.log('Save trip response status:', response.status);
-    console.log('Save trip response headers:', Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => {
-        console.error('Failed to parse error response as JSON');
-        return null;
-      });
-      
-      console.error('Save trip error details:', errorData);
-      
-      if (response.status === 409) {
-        throw new Error('You already have a similar trip planned. Please modify the existing trip or change the dates/destination.');
-      }
-
-      console.error('Save trip error:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        error: errorData
-      });
-
-      if (response.status === 401) {
-        throw new Error('Please sign in again to save your trip');
-      } else if (response.status === 403) {
-        throw new Error('You do not have permission to save this trip');
-      } else {
-        throw new Error(errorData?.detail || `Failed to save trip: ${response.statusText}`);
-      }
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to save trip');
     }
 
     const savedTrip = await response.json();
-    console.log('Trip saved successfully:', {
-      id: savedTrip.id,
-      destination: savedTrip.formData?.destination,
-      hasItinerary: !!savedTrip.itinerary,
-      itineraryDays: savedTrip.itinerary?.days?.length || 0,
-      responseData: JSON.stringify(savedTrip, null, 2)
-    });
-    return savedTrip;
+    if (!savedTrip || !savedTrip.id) {
+      throw new Error('Invalid response from server');
+    }
+    return savedTrip as SavedTrip;
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Failed to save trip';
     console.error('Error saving trip:', error);
-    const userEmail = localStorage.getItem('userEmail');
-    notifyError(error, userEmail);
+    notifyError(errorMsg, tripData.userId);
     throw error;
   }
 };
@@ -168,23 +123,25 @@ export const updateTrip = async (
   }
 };
 
-export const getUserTrips = async (userId: string): Promise<any[]> => {
+export const getUserTrips = async (userId: string): Promise<SavedTrip[]> => {
   try {
-    const response = await fetch(`${API_URL}/trips/user/${userId}`, {
-      headers: getAuthHeaders(),
+    const response = await fetch(`${API_URL}/trips?userId=${userId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
       credentials: 'include',
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch trips: ${response.status} ${response.statusText}`);
-      throw new Error(`Failed to fetch trips: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to fetch trips');
     }
 
     return await response.json();
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Failed to fetch trips';
     console.error('Error fetching trips:', error);
-    const userEmail = localStorage.getItem('userEmail');
-    notifyError(error, userEmail);
+    notifyError(errorMsg, userId);
     throw error;
   }
 }; 

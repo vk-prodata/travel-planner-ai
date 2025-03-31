@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip, Accordion } from 'react-bootstrap';
+import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip, Accordion, Alert } from 'react-bootstrap';
 import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType } from '../types';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 
@@ -50,7 +50,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     // Validate that stop dates are within trip dates
     const stopStart = new Date(newStop.startDate);
     const stopEnd = new Date(newStop.startDate);
-    stopEnd.setDate(stopEnd.getDate() + (newStop.days)- 1); //TODO Keep the start day in the range
+    stopEnd.setDate(stopEnd.getDate() + (newStop.days)- 1);
     
     const tripStart = new Date(formData.startDate);
     const tripEnd = new Date(formData.endDate);
@@ -63,7 +63,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
     // Add the stop with the exact date selected
     setFormData({
       ...formData,
-      intermediateStops: [...formData.intermediateStops, newStop]
+      intermediateStops: [...(formData.intermediateStops || []), newStop]
     });
     setNewStop({ destination: '', startDate: '', days: 1 });
     setStopError(null);
@@ -72,14 +72,15 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
   const removeStop = (index: number) => {
     setFormData({
       ...formData,
-      intermediateStops: formData.intermediateStops.filter((_: Stop, i: number) => i !== index)
+      intermediateStops: formData.intermediateStops?.filter((_: Stop, i: number) => i !== index) || []
     });
   };
 
   const togglePreference = (pref: EntertainmentPreference) => {
-    const newPrefs = formData.entertainmentPreferences.includes(pref)
-      ? formData.entertainmentPreferences.filter((p: EntertainmentPreference) => p !== pref)
-      : [...formData.entertainmentPreferences, pref];
+    const currentPrefs = formData.entertainmentPreferences || [];
+    const newPrefs = currentPrefs.includes(pref)
+      ? currentPrefs.filter((p: EntertainmentPreference) => p !== pref)
+      : [...currentPrefs, pref];
     setFormData({ ...formData, entertainmentPreferences: newPrefs });
   };
 
@@ -389,7 +390,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                 <div className="text-danger mb-2 small">{stopError}</div>
               )}
               <div className="d-flex flex-wrap gap-2">
-                {formData.intermediateStops.map((stop: Stop, index: number) => (
+                {formData.intermediateStops?.map((stop: Stop, index: number) => (
                   <Badge key={index} bg="secondary" className="d-flex align-items-center p-2">
                     {stop.destination} {stop.startDate && new Date(stop.startDate).toLocaleDateString()} ({stop.days} {stop.days === 1 ? 'day' : 'days'})
                     <Button variant="link" className="p-0 ms-2 text-light" onClick={() => removeStop(index)}>×</Button>
@@ -474,7 +475,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
           ].map((pref) => (
             <Button
               key={pref}
-              variant={formData.entertainmentPreferences.includes(pref as EntertainmentPreference) ? 'primary' : 'outline-primary'}
+              variant={(formData.entertainmentPreferences || []).includes(pref as EntertainmentPreference) ? 'primary' : 'outline-primary'}
               onClick={() => togglePreference(pref as EntertainmentPreference)}
               size="sm"
               className="text-capitalize"

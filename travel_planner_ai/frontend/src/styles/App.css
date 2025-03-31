@@ -1,0 +1,38 @@
+/* App.css */
+.min-vh-100 {
+  min-height: 100vh;
+}
+
+.text-primary-dark {
+  color: #2c3e50;
+}
+
+.bg-primary-light {
+  background-color: #f8f9fa;
+}
+
+.title-export-buttons .btn {
+  padding: 0.25rem 0.5rem;
+}
+
+.title-export-icon {
+  color: #6c757d;
+  transition: color 0.2s;
+}
+
+.title-export-icon:hover {
+  color: #0d6efd;
+}
+
+.export-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .container-fluid {
+    padding: 0;
+  }
+} 

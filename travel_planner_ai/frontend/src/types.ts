@@ -32,7 +32,11 @@ export interface Day {
 
 export interface TripItinerary {
   tripId: string;
-  days: Day[];
+  title?: string;
+  days: {
+    date: string;
+    activities: Activity[];
+  }[];
 }
 
 export interface Stop {
@@ -43,49 +47,24 @@ export interface Stop {
 
 export type TravelType = 'flight' | 'train' | 'car' | 'bus' | 'cruise';
 
-export type EntertainmentPreference = 
-  | 'family-friendly'
-  | 'cultural'
-  | 'outdoor'
-  | 'nightlife'
-  | 'shopping'
-  | 'relaxation';
+export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food' | 'adventure' | 'educational' | 'nightlife' | 'must-see';
 
-export type CuisineType = 
-  | 'any'
-  | 'local'
-  | 'seafood'
-  | 'mediterranean'
-  | 'asian'
-  | 'european'
-  | 'american'
-  | 'mexican'
-  | 'japanese'
-  | 'italian'
-  | 'slavic'
-  | 'indian'
-  | 'thai'
-  | 'international'
-  | 'vegetarian'
-  | 'vegan'
-  | 'halal'
-  | 'kosher';
+export type CuisineType = 'any' | 'local' | 'international' | 'vegetarian' | 'halal' | 'kosher';
 
 export interface TripFormData {
+  travelType: TravelType;
   origin?: string;
   destination: string;
   startDate: string;
   endDate: string;
-  travelType: TravelType;
   adults: number;
-  children: number;
-  infants: number;
-  budget: string;
+  children?: number;
+  infants?: number;
+  intermediateStops?: Stop[];
+  entertainmentPreferences?: EntertainmentPreference[];
   budgetLevel: BudgetLevel;
+  budget: string;
   language: string;
-  entertainmentPreferences: EntertainmentPreference[];
-  intermediateStops: Stop[];
-  notes?: string;
   cuisinePreference: CuisineType;
 }
 
@@ -99,4 +78,25 @@ export interface TripHash {
   endDate: string;
 }
 
-export type PriceLevel = 'free' | '$' | '$$' | '$$$'; 
+export type PriceLevel = 'free' | '$' | '$$' | '$$$';
+
+export interface DailyItinerary {
+  date: string;
+  activities: Activity[];
+}
+
+export interface TripItinerary {
+  tripId: string;
+  days: DailyItinerary[];
+  hotels?: string[];
+  generated_at?: string;
+}
+
+export interface SavedTrip {
+  id: string;
+  user_id: string;
+  formData: TripFormData;
+  itinerary: TripItinerary;
+  created_at?: string;
+  updated_at?: string;
+} 

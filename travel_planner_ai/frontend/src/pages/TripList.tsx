@@ -8,31 +8,12 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/TripList.css';
 import { notifyError, notifySuccess } from '../services/errorService';
 import LoggingToggle from '../components/LoggingToggle';
-
-// Define Trip interface based on API response
-interface Trip {
-  id: string;
-  user_id: string;
-  formData: {
-    destination: string;
-    origin?: string;
-    startDate: string;
-    endDate: string;
-    travelType: string;
-    adults: number;
-    children: number;
-    infants: number;
-    budget: string;
-  };
-  itinerary: any;
-  created_at?: string;
-  updated_at?: string;
-}
+import { SavedTrip } from '../types';
 
 const TripList: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips] = useState<SavedTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -223,14 +204,23 @@ const TripList: React.FC = () => {
           </Alert>
         ) : (
           <Row xs={1} md={2} lg={3} className="g-4">
-            {trips.map((trip) => (
+            {[...trips]
+              .sort((a, b) => {
+                // Sort by created_at in descending order (newest first)
+                const dateA = new Date(a.updated_at || 0);
+                const dateB = new Date(b.updated_at || 0);
+                return dateB.getTime() - dateA.getTime();
+              })
+              .map((trip) => (
               <Col key={trip.id}>
                 <Card className="trip-card h-100">
                   <Card.Body>
                     <div className="travel-type-icon">
                       {getTravelIcon(trip.formData.travelType)}
                     </div>
-                    <Card.Title className="mb-3">{trip.formData.destination}</Card.Title>
+                    <Card.Title className="mb-3">
+                      {trip.itinerary?.title || trip.formData.destination}
+                    </Card.Title>
                     <Card.Subtitle className="mb-2 text-muted">
                       {trip.formData.origin ? `From ${trip.formData.origin}` : ''}
                     </Card.Subtitle>

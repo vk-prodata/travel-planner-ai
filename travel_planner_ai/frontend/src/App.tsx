@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Button } from 'react-bootstrap';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import TripForm from './components/TripForm';
@@ -8,16 +7,17 @@ import TripExport from './components/TripExport';
 import TripTitleExport from './components/TripTitleExport';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaPlaneDeparture, FaEdit, FaSave, FaList } from 'react-icons/fa';
+import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 import { saveTrip, updateTrip } from './services/tripService';
-import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import TripList from './pages/TripList';
 import LoggingToggle from './components/LoggingToggle';
 import { notifyError, notifySuccess } from './services/errorService';
+import { generateItinerary } from './services/itineraryService';
+import './styles/App.css';
 
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
@@ -191,22 +191,83 @@ const MainApp = () => {
         throw new Error('End date must be after start date');
       }
 
-      const newItinerary = await generateItinerary(data);
+      const newItinerary = await generateItinerary(data, user.id);
       if (newItinerary) {
         setItinerary(newItinerary);
         setLocalItinerary(newItinerary);
-        setHasUnsavedChanges(true);
-        notifySuccess('Trip generated successfully!');
+        
+        // Auto-save the trip
+        try {
+          const tripData = {
+            userId: user.id,
+            formData: {
+              ...data,
+              updateExisting: true // Always try to update if exists
+            },
+            itinerary: newItinerary
+          };
+          
+          const savedTrip = await saveTrip(tripData);
+          setCurrentTripId(savedTrip.id);
+          setHasUnsavedChanges(false);
+          notifySuccess('Trip generated and saved successfully!');
+          // Update URL without redirecting
+          window.history.replaceState(null, '', `/?tripId=${savedTrip.id}`);
+        } catch (saveError: any) {
+          console.error('Error saving trip:', saveError);
+          setHasUnsavedChanges(true);
+          
+          // If it's not a conflict error, show generic error
+          if (!saveError.message?.includes('similar trip already exists')) {
+            notifyError('Failed to save trip. Please try saving manually.', user?.email);
+            return;
+          }
+
+          // For conflict errors, ask user what to do
+          const confirmUpdate = window.confirm(
+            'A similar trip already exists. Would you like to update the existing trip instead?'
+          );
+          
+          if (confirmUpdate) {
+            try {
+              const tripData = {
+                userId: user.id,
+                formData: {
+                  ...data,
+                  updateExisting: true
+                },
+                itinerary: newItinerary
+              };
+              
+              const savedTrip = await saveTrip(tripData);
+              setCurrentTripId(savedTrip.id);
+              setHasUnsavedChanges(false);
+              notifySuccess('Existing trip updated successfully!');
+              window.history.replaceState(null, '', `/?tripId=${savedTrip.id}`);
+            } catch (updateError) {
+              console.error('Error updating trip:', updateError);
+              setHasUnsavedChanges(true);
+              notifyError('Failed to update existing trip. Please try saving manually.', user?.email);
+            }
+          } else {
+            setHasUnsavedChanges(true);
+            notifyError('Trip generated but not saved. Please try saving with a different destination or dates.', user?.email);
+          }
+        }
       }
     } catch (error) {
-      console.error('Error:', error);
-      notifyError(error instanceof Error ? error.message : 'Failed to generate itinerary', null);
+      console.error('Error generating trip:', error);
+      notifyError(error instanceof Error ? error.message : 'Failed to generate trip', user?.email);
     } finally {
       setIsLoading(false);
     }
   };
 
   const getTripTitle = () => {
+    if (itinerary?.title) {
+      return itinerary.title;
+    }
+    
     if (!formData) return 'New Trip';
     
     const destination = formData.destination;
@@ -400,74 +461,6 @@ const MainApp = () => {
     }
   }, [itinerary, localItinerary]);
 
-  const generateItinerary = async (formData: TripFormData) => {
-    if (!user) {
-      notifyError('Please sign in to generate an itinerary', null);
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/generate-itinerary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          formData: {
-            ...formData,
-            origin: formData.origin || '',
-            destination: formData.destination,
-            startDate: formData.startDate,
-            endDate: formData.endDate,
-            travelType: formData.travelType,
-            adults: formData.adults,
-            children: formData.children || 0,
-            infants: formData.infants || 0,
-            budgetLevel: formData.budgetLevel,
-            entertainmentPreferences: formData.entertainmentPreferences || [],
-            intermediateStops: formData.intermediateStops || []
-          }
-        })
-      });
-
-      let errorMessage = 'Failed to generate itinerary';
-      
-      try {
-        const data = await response.json();
-        
-        if (!response.ok) {
-          errorMessage = `Error (${response.status}): ${data.detail || 'Unknown error'}`;
-          console.error('API Error:', {
-            status: response.status,
-            data: data,
-            user: user.email
-          });
-          throw new Error(errorMessage);
-        }
-
-        if (!data.success || !data.itinerary) {
-          throw new Error('Invalid response format from server');
-        }
-
-        return data.itinerary;
-      } catch (parseError) {
-        console.error('Response parsing error:', parseError);
-        throw new Error(`Server error: ${errorMessage}. Please try again later.`);
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Trip generation error:', {
-        error,
-        user: user.email,
-        formData
-      });
-      notifyError(`Dear ${user.email}, there was an error: ${errorMsg}`, user?.email);
-      throw error;
-    }
-  };
-
   const refreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity) => {
     if (!user || !formData) {
       notifyError('Please sign in to refresh activities', user?.email);
@@ -552,20 +545,39 @@ const MainApp = () => {
   };
 
   const handleTitleSave = async () => {
-    if (!itinerary || !editedTitle) return;
+    if (!itinerary || !editedTitle || !currentTripId || !user || !formData) {
+      notifyError('Cannot save title: Missing required data', user?.email);
+      return;
+    }
     
     try {
       setIsSaving(true);
       const newItinerary = {
         ...itinerary,
-        title: editedTitle
+        title: editedTitle,
+        days: itinerary.days.map(day => ({ ...day })) // Deep clone days
       };
       
+      // Save to backend
+      const tripData = {
+        userId: user.id,
+        formData: formData,
+        itinerary: newItinerary
+      };
+      
+      await updateTrip(currentTripId, tripData);
+      
+      // Update both local and main itinerary states
       setItinerary(newItinerary);
       setLocalItinerary(newItinerary);
       setIsEditingTitle(false);
-      setHasUnsavedChanges(true);
+      setHasUnsavedChanges(false);
       notifySuccess('Title updated successfully');
+      
+      // Force a page refresh for the trips list if we're on that page
+      if (window.location.pathname === '/trips') {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Error saving title:', error);
       notifyError('Failed to save title', user?.email);
@@ -689,6 +701,20 @@ const MainApp = () => {
                             </>
                           )}
                         </Button>
+                        {currentTripId && (
+                          <Button
+                            variant="outline-primary"
+                            onClick={() => {
+                              const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
+                              navigator.clipboard.writeText(shareUrl);
+                              notifySuccess('Share URL copied to clipboard!');
+                            }}
+                            className="d-flex align-items-center gap-2"
+                          >
+                            <FaShare className="me-1" />
+                            Share
+                          </Button>
+                        )}
                         {itinerary && formData && (
                           <TripExport itinerary={itinerary} formData={formData} />
                         )}
