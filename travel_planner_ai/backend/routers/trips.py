@@ -100,40 +100,31 @@ async def get_trip(
     try:
         logger.info(f"Fetching trip {trip_id} for user: {current_user['email']}")
         
-        # First try direct UUID match (handle UUIDs from frontend)
+        # First try direct UUID match without user_id constraint
         trip = db.trips_collection.find_one({
-            "id": trip_id,
-            "user_id": current_user["id"]
+            "id": trip_id
         })
         
         logger.debug(f"Direct UUID search result: {trip is not None}")
         
-        # If not found, try with ObjectId (handle MongoDB _id)
+        # If not found, try with ObjectId without user_id constraint
         if not trip:
             try:
                 logger.debug(f"Trying ObjectId search for {trip_id}")
                 trip = db.trips_collection.find_one({
-                    "_id": ObjectId(trip_id),
-                    "user_id": current_user["id"]
+                    "_id": ObjectId(trip_id)
                 })
                 logger.debug(f"ObjectId search result: {trip is not None}")
             except Exception as e:
                 logger.warning(f"Could not convert {trip_id} to ObjectId: {e}")
-                # Continue - we already tried with direct UUID match
         
         if not trip:
-            # Try one more approach - search by id without user_id constraint
-            # This is useful for debugging and can be removed in production
-            debug_trip = db.trips_collection.find_one({"id": trip_id})
-            if debug_trip:
-                logger.warning(f"Found trip {trip_id} but it belongs to user {debug_trip.get('user_id')} not {current_user['id']}")
-            else:
-                logger.warning(f"Trip {trip_id} not found in database at all")
-            
+            logger.warning(f"Trip {trip_id} not found in database")
             raise HTTPException(status_code=404, detail="Trip not found")
         
-        # Normalize trip data for frontend compatibility
+        # Add a flag to indicate if the current user is the owner
         normalized_trip = normalize_trip_data(trip)
+        normalized_trip["isOwner"] = trip.get("user_id") == current_user["id"]
         
         # Ensure itinerary is properly included
         if not normalized_trip.get("itinerary"):

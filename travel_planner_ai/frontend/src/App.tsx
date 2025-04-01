@@ -114,9 +114,21 @@ const MainApp = () => {
               return;
             }
             
+            // Ensure isOwner flag is set in the itinerary
+            const itineraryWithOwnership = {
+              ...trip.itinerary,
+              isOwner: trip.isOwner ?? trip.user_id === user.id
+            };
+            
+            console.log('Setting itinerary with ownership:', {
+              isOwner: itineraryWithOwnership.isOwner,
+              userId: trip.user_id,
+              currentUserId: user.id
+            });
+            
             setFormData(trip.formData);
-            setItinerary(trip.itinerary);
-            setLocalItinerary(trip.itinerary);
+            setItinerary(itineraryWithOwnership);
+            setLocalItinerary(itineraryWithOwnership);
             setCurrentTripId(trip.id);
             setHasUnsavedChanges(false);
             notifySuccess('Trip loaded successfully!');
@@ -336,10 +348,11 @@ const MainApp = () => {
 
     setIsSaving(true);
     try {
-      // Ensure the itinerary has a tripId
+      // Ensure the itinerary has a tripId and isOwner flag
       const itineraryWithId = {
         ...localItinerary,
-        tripId: currentTripId || 'temp-' + Date.now()
+        tripId: currentTripId || 'temp-' + Date.now(),
+        isOwner: true // We're the owner when saving a new trip
       };
       
       // Add updateExisting flag for Tahoe trips or when user confirms overwrite
@@ -555,7 +568,8 @@ const MainApp = () => {
       const newItinerary = {
         ...itinerary,
         title: editedTitle,
-        days: itinerary.days.map(day => ({ ...day })) // Deep clone days
+        days: itinerary.days.map(day => ({ ...day })), // Deep clone days
+        isOwner: itinerary.isOwner // Preserve ownership
       };
       
       // Save to backend
@@ -743,6 +757,7 @@ const MainApp = () => {
                   onActivityDelete={handleActivityDelete}
                   onActivityRefresh={refreshActivity}
                   isLoading={isLoading}
+                  isOwner={itinerary?.isOwner ?? false}
                 />
               </div>
             ) : (

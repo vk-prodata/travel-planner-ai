@@ -33,6 +33,7 @@ export interface Day {
 export interface TripItinerary {
   tripId: string;
   title?: string;
+  isOwner?: boolean;
   days: {
     date: string;
     activities: Activity[];
