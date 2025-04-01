@@ -30,9 +30,86 @@
   gap: 0.5rem;
 }
 
-/* Responsive styles */
+/* Share dropdown styles */
+.dropdown-menu {
+  min-width: 200px;
+  padding: 0.5rem 0;
+  margin: 0;
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 0.5rem 1rem;
+  color: var(--dark);
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+/* Title and activity header styles */
+.text-primary-dark.m-0 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.5rem !important;
+}
+
+.d-flex.align-items-center.gap-2 {
+  flex-wrap: nowrap;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
   .container-fluid {
     padding: 0;
+  }
+  
+  /* Header section responsive styles */
+  .d-flex.align-items-center.justify-content-between.flex-wrap {
+    gap: 1rem !important;
+  }
+
+  h3.text-primary-dark {
+    font-size: 1.25rem;
+    min-width: auto;
+  }
+
+  /* Activity header responsive styles */
+  .activity-time {
+    font-size: 0.85rem !important;
+    min-width: 70px !important;
+  }
+
+  .badge {
+    font-size: 0.7rem !important;
+    padding: 0.2rem 0.4rem !important;
+  }
+
+  .dropdown-menu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 300px;
+    border-radius: 8px;
+    background: white;
+    z-index: 1050;
+  }
+
+  /* Ensure buttons stack properly on mobile */
+  .d-flex.gap-2.flex-wrap {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  /* Make buttons more touch-friendly on mobile */
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
   }
 } 

@@ -603,7 +603,7 @@ const MainApp = () => {
   return (
     <Container fluid className="p-0 min-vh-100 d-flex flex-column">
       <Row className="g-0">
-        <Col md={4} className="border-end shadow-sm" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
+        <Col md={4} className="border-end shadow-sm order-2 order-md-1" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
           <div className="p-2">
             <div className="bg-light p-2 rounded shadow-sm">
               <div className="d-flex justify-content-between align-items-center mb-4">
@@ -643,7 +643,7 @@ const MainApp = () => {
           </div>
         </Col>
 
-        <Col md={8} className="bg-light">
+        <Col md={8} className="bg-light order-1 order-md-2">
           <div className="p-4">
             {isLoading ? (
               <div className="text-center py-5">
@@ -654,7 +654,7 @@ const MainApp = () => {
               </div>
             ) : itinerary ? (
               <div>
-                <div className="d-flex align-items-center justify-content-between mb-4">
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
                   {isEditingTitle ? (
                     <div className="d-flex align-items-center gap-2">
                       <input
@@ -673,27 +673,31 @@ const MainApp = () => {
                       </Button>
                     </div>
                   ) : (
-                    <div className="d-flex align-items-center gap-2">
-                      <h3 className="text-primary-dark m-0">
-                        {getTripTitle()}
-                      </h3>
-                      <Button 
-                        variant="link"
-                        size="sm"
-                        className="p-0 text-secondary"
-                        onClick={() => {
-                          setEditedTitle(getTripTitle());
-                          setIsEditingTitle(true);
-                        }}
-                      >
-                        <FaEdit size={14} />
-                      </Button>
-                      {itinerary && formData && (
-                        <TripTitleExport itinerary={itinerary} formData={formData} />
-                      )}
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <div className="d-flex align-items-center gap-2">
+                        <h3 className="text-primary-dark m-0">
+                          {getTripTitle()}
+                        </h3>
+                        <div className="d-flex gap-2 align-items-center">
+                          <Button 
+                            variant="link"
+                            size="sm"
+                            className="p-0 text-secondary"
+                            onClick={() => {
+                              setEditedTitle(getTripTitle());
+                              setIsEditingTitle(true);
+                            }}
+                          >
+                            <FaEdit size={14} />
+                          </Button>
+                          {itinerary && formData && (
+                            <TripTitleExport itinerary={itinerary} formData={formData} />
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div className="d-flex gap-2">
+                  <div className="d-flex gap-2 flex-wrap">
                     {user ? (
                       <>
                         <Button
@@ -715,22 +719,36 @@ const MainApp = () => {
                             </>
                           )}
                         </Button>
-                        {currentTripId && (
-                          <Button
-                            variant="outline-primary"
-                            onClick={() => {
-                              const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
-                              navigator.clipboard.writeText(shareUrl);
-                              notifySuccess('Share URL copied to clipboard!');
-                            }}
-                            className="d-flex align-items-center gap-2"
-                          >
-                            <FaShare className="me-1" />
-                            Share
-                          </Button>
-                        )}
-                        {itinerary && formData && (
-                          <TripExport itinerary={itinerary} formData={formData} />
+                        {currentTripId && itinerary && formData && (
+                          <div className="dropdown">
+                            <Button
+                              variant="outline-primary"
+                              className="dropdown-toggle d-flex align-items-center gap-2"
+                              data-bs-toggle="dropdown"
+                              aria-expanded="false"
+                            >
+                              <FaShare className="me-1" />
+                              Share
+                            </Button>
+                            <ul className="dropdown-menu">
+                              <li>
+                                <Button
+                                  variant="link"
+                                  className="dropdown-item"
+                                  onClick={() => {
+                                    const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
+                                    navigator.clipboard.writeText(shareUrl);
+                                    notifySuccess('Share URL copied to clipboard!');
+                                  }}
+                                >
+                                  Copy Link
+                                </Button>
+                              </li>
+                              <li>
+                                <TripExport itinerary={itinerary} formData={formData} />
+                              </li>
+                            </ul>
+                          </div>
                         )}
                       </>
                     ) : (
