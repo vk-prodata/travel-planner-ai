@@ -1,6 +1,6 @@
 # Empty file to make the directory a Python package 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from dotenv import load_dotenv
 import os
 import logging
@@ -25,15 +25,20 @@ class Settings(BaseModel):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24  # 24 hours
 
-    class Config:
-        env_file = ".env"
+    # Stripe settings
+    stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
+    stripe_publishable_key: str = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+    stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Log loaded settings (without sensitive values)
         logger.info(f"Loaded settings: MongoDB URI: {'set' if self.mongodb_uri else 'not set'}, "
                    f"Google Client ID: {'set' if self.google_client_id else 'not set'}, "
-                   f"OpenAI API Key: {'set' if self.openai_api_key else 'not set'}")
+                   f"OpenAI API Key: {'set' if self.openai_api_key else 'not set'}, "
+                   f"Stripe Keys: {'set' if self.stripe_secret_key and self.stripe_publishable_key else 'not set'}")
         
         # Validate required settings
         if not self.mongodb_uri:

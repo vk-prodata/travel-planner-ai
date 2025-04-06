@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from ..database import get_db
+from ..database import get_db, get_user_collection
 from ..auth import get_current_user
 from ..models import TripCreate, TripUpdate
 from bson import ObjectId
@@ -147,15 +147,25 @@ async def get_trip(
 async def create_trip(
     trip_data: TripCreate,
     current_user = Depends(get_current_user),
-    db = Depends(get_db)
+    db = Depends(get_db),
+    users_collection = Depends(get_user_collection)
 ):
     try:
         logger.info(f"Creating trip for user: {current_user['email']}")
         logger.debug(f"Trip data received: {trip_data}")
         
+        # Check if user has enough credits
+        from ..services.credits_service import deduct_credits
+        user_id = current_user["id"]
+        
+        # Deduct 1 credit for trip creation (this will also check if they have enough credits)
+        logger.info(f"Checking and deducting credits for user {user_id}")
+        credits_result = await deduct_credits(users_collection, user_id, 1)
+        logger.info(f"Credits deducted. Remaining credits: {credits_result['available_credits']}")
+        
         # Convert Pydantic model to dict and add user_id
         trip_dict = trip_data.dict()
-        trip_dict["user_id"] = current_user["id"]
+        trip_dict["user_id"] = user_id
         
         # Validate and ensure itinerary is included
         if "itinerary" not in trip_dict or not trip_dict["itinerary"]:

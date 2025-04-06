@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from travel_planner_ai.backend.routes import router as trip_router
 from travel_planner_ai.backend.routers.trips import router as trips_router
+from travel_planner_ai.backend.routers.credits import router as credits_router
 from .config.logging_config import setup_logging
 import logging
 import time
@@ -31,8 +32,9 @@ app.add_middleware(
 )
 
 # Include routers without prefixes to match frontend expectations
-app.include_router(trip_router)  # No prefix for routes to match frontend calls
-app.include_router(trips_router)  # No prefix since it already includes "/trips" in routes
+app.include_router(trip_router)    # No prefix for routes to match frontend calls
+app.include_router(trips_router)   # No prefix since it already includes "/trips" in routes
+app.include_router(credits_router) # Include the new credits router
 
 logger.info("Routers configured and ready")
 

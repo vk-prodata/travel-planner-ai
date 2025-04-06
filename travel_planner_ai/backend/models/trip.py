@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import date, datetime
 from enum import Enum
 import hashlib
@@ -54,7 +54,7 @@ class TripCreate(BaseModel):
     formData: Dict[str, Any]
     itinerary: Optional[Dict[str, Any]] = None
 
-    @validator('formData')
+    @field_validator('formData')
     def validate_form_data(cls, v):
         required_fields = ['destination', 'startDate', 'endDate']
         for field in required_fields:
@@ -62,29 +62,20 @@ class TripCreate(BaseModel):
                 raise ValueError(f"Missing required field: {field}")
         return v
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "userId": "123",
-                "formData": {
-                    "destination": "Paris",
-                    "startDate": "2024-03-01",
-                    "endDate": "2024-03-07",
-                    "travelType": "flight",
-                    "adults": 1
-                },
-                "itinerary": {
-                    "days": []
-                }
-            }
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        json_encoders={
+            datetime: lambda v: v.isoformat(),
+            date: lambda v: v.isoformat()
         }
+    )
 
 class TripUpdate(BaseModel):
     userId: Optional[str] = None
     formData: Optional[Dict[str, Any]] = None
     itinerary: Optional[Dict[str, Any]] = None
 
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "formData": {
@@ -98,6 +89,7 @@ class TripUpdate(BaseModel):
                 }
             }
         }
+    )
 
 class TripRequest(BaseModel):
     trip_details: TripDetails
@@ -112,4 +104,13 @@ class TripResponse(BaseModel):
     formData: Dict[str, Any]
     itinerary: Dict[str, Any]
     created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None 
+    updated_at: Optional[datetime] = None
+
+class Trip(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        json_encoders={
+            datetime: lambda v: v.isoformat(),
+            date: lambda v: v.isoformat()
+        }
+    ) 
