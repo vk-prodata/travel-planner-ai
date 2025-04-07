@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '../types';
+import { getUserCredits } from '../services/creditsService';
 
 interface AuthContextType {
   user: User | null;
@@ -63,24 +64,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleCredentialResponse = async (response: any) => {
     try {
-      // Use the access token to get user info
-      const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      console.log('Handling credential response');
+      const token = response.access_token;
+      
+      // First, verify with our backend
+      console.log('Sending token to backend for verification');
+      const backendResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/google`, {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${response.access_token}`
-        }
-      }).then(res => res.json());
-
-      setUser({
-        id: userInfo.sub,  // Use the Google user ID
-        name: userInfo.name,
-        email: userInfo.email
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token })
       });
 
-      // Store the token and user email
-      localStorage.setItem('token', response.credential);
-      localStorage.setItem('userEmail', userInfo.email);
+      if (!backendResponse.ok) {
+        console.error('Backend auth failed:', await backendResponse.text());
+        throw new Error('Backend authentication failed');
+      }
+
+      const backendUser = await backendResponse.json();
+      console.log('Backend auth successful:', backendUser);
+
+      // Create user data from backend response
+      const userData: User = {
+        id: backendUser.id,
+        name: backendUser.name,
+        email: backendUser.email,
+        availableCredits: backendUser.available_credits,
+        totalCreditsPurchased: backendUser.total_credits_purchased
+      };
+
+      console.log('Created user data object:', userData);
+
+      setUser(userData);
+      console.log('User state set:', userData);
+
+      // Store the token
+      localStorage.setItem('token', token);
+      localStorage.setItem('userEmail', userData.email);
+      console.log('Saved auth data to localStorage');
     } catch (error) {
       console.error('Error handling credential:', error);
+      throw error;
     }
   };
 
@@ -102,28 +127,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
 
             const token = response.access_token;
-            localStorage.setItem('token', token);
             
-            const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            // First, verify with our backend
+            console.log('Sending token to backend for verification');
+            const backendResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/google`, {
+              method: 'POST',
               headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            }).then(res => res.json());
-
-            console.log('User Info:', {
-              id: userInfo.sub,
-              email: userInfo.email,
-              name: userInfo.name
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ token })
             });
 
-            setUser({
-              id: userInfo.sub,
-              name: userInfo.name,
-              email: userInfo.email
-            });
-            
-            // Store the user email in localStorage
-            localStorage.setItem('userEmail', userInfo.email);
+            if (!backendResponse.ok) {
+              console.error('Backend auth failed:', await backendResponse.text());
+              throw new Error('Backend authentication failed');
+            }
+
+            const backendUser = await backendResponse.json();
+            console.log('Backend auth successful:', backendUser);
+
+            // Create user data from backend response
+            const userData: User = {
+              id: backendUser.id,
+              name: backendUser.name,
+              email: backendUser.email,
+              availableCredits: backendUser.available_credits,
+              totalCreditsPurchased: backendUser.total_credits_purchased
+            };
+
+            console.log('Created user data object:', userData);
+
+            setUser(userData);
+            console.log('User state set:', userData);
+
+            // Store the token
+            localStorage.setItem('token', token);
+            localStorage.setItem('userEmail', userData.email);
+            console.log('Saved auth data to localStorage');
             
             resolve();
           } catch (error) {

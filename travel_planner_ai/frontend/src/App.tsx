@@ -14,6 +14,8 @@ import { saveTrip, updateTrip } from './services/tripService';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import TripList from './pages/TripList';
+import Credits from './pages/Credits';
+import CreditsDisplay from './components/CreditsDisplay';
 import LoggingToggle from './components/LoggingToggle';
 import { notifyError, notifySuccess } from './services/errorService';
 import { generateItinerary } from './services/itineraryService';
@@ -617,11 +619,12 @@ const MainApp = () => {
                     <AuthForm />
                   ) : (
                     <div className="d-flex">
+                      <CreditsDisplay />
                       <Button 
                         variant="outline-primary" 
                         size="sm" 
                         onClick={() => navigate('/trips')}
-                        className="rounded-pill me-2"
+                        className="rounded-pill mx-2"
                       >
                         <FaList className="me-1" /> My Trips
                       </Button>
@@ -818,6 +821,7 @@ const App = () => {
       <Routes>
         <Route path="/" element={<MainApp />} />
         <Route path="/trips" element={<TripList />} />
+        <Route path="/credits" element={<Credits />} />
       </Routes>
     </Router>
   );

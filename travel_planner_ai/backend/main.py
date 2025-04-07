@@ -1,18 +1,30 @@
 # backend/main.py
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from travel_planner_ai.backend.routes import router as trip_router
 from travel_planner_ai.backend.routers.trips import router as trips_router
 from travel_planner_ai.backend.routers.credits import router as credits_router
 from .config.logging_config import setup_logging
+from .auth import get_current_user
+from .database import get_user_collection
 import logging
 import time
 import json
+import os
+from dotenv import load_dotenv
+from pymongo import MongoClient
+from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import status
+
+from .models.user import User, UserResponse
 
 # Setup logging
 app_logger = setup_logging()
 logger = logging.getLogger("travel_planner_ai.main")
 logger.info("Starting Travel Planner AI application")
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Travel Planner AI")
 
@@ -104,5 +116,80 @@ async def test():
 async def root():
     logger.info("Root endpoint accessed")
     return {"message": "Welcome to Travel Planner AI API"}
+
+# MongoDB setup
+MONGO_URI = os.getenv("MONGODB_URI")  # Changed from MONGO_URI to MONGODB_URI to match your environment
+if not MONGO_URI:
+    raise ValueError("MONGODB_URI environment variable is not set")
+
+client = MongoClient(MONGO_URI)
+db = client.travel_planner
+users_collection = db.users
+
+# Google OAuth setup
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+if not GOOGLE_CLIENT_ID:
+    raise ValueError("GOOGLE_CLIENT_ID environment variable is not set")
+
+@app.post("/auth/google", response_model=UserResponse)
+async def google_auth(
+    request: Request,
+    users_collection = Depends(get_user_collection)
+):
+    """
+    Authenticate user with Google OAuth token and return user data
+    """
+    try:
+        # Get token from request body
+        body = await request.json()
+        token = body.get('token')
+        
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token is required"
+            )
+        
+        # Create credentials object for get_current_user
+        credentials = HTTPAuthorizationCredentials(
+            scheme="Bearer",
+            credentials=token
+        )
+        
+        # Get user data using existing auth flow
+        user_data = await get_current_user(credentials, users_collection)
+        
+        # Convert to dict if it's a Pydantic model
+        if hasattr(user_data, 'model_dump'):
+            user_data = user_data.model_dump()
+        elif hasattr(user_data, 'dict'):
+            user_data = user_data.dict()
+            
+        logger.info(f"User data before response: {user_data}")
+        
+        # Return user response
+        return UserResponse(
+            id=user_data.get("id") or user_data.get("_id"),  # Try both id and _id
+            email=user_data["email"],
+            name=user_data["name"],
+            available_credits=user_data.get("available_credits", 0),
+            total_credits_purchased=user_data.get("total_credits_purchased", 0)
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON in request body"
+        )
+    except Exception as e:
+        logger.error(f"Error in google_auth: {str(e)}")
+        logger.error(f"User data at error: {user_data if 'user_data' in locals() else 'Not available'}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 # Run with: uvicorn main:app --reload

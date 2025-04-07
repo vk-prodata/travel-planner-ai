@@ -6,56 +6,63 @@ from ..models.user import User, UserCreate, UserResponse
 
 logger = logging.getLogger(__name__)
 
-async def create_user_if_not_exists(users_collection: Collection, user_data: dict) -> User:
-    """
-    Create a user if they don't already exist in the database.
-    Grants 1 free credit on signup.
-    
-    Args:
-        users_collection: MongoDB users collection
-        user_data: Dictionary with user information (id, email, name)
-        
-    Returns:
-        User: The created or existing user
-    """
+def create_user_if_not_exists(users_collection: Collection, user_data: dict) -> User:
+    """Create a new user if they don't exist, otherwise update their info."""
     logger.info(f"Checking if user exists: {user_data.get('email')}")
+    logger.info(f"User data received: {user_data}")
     
-    # Check if user exists
-    existing_user = await users_collection.find_one({"id": user_data["id"]})
+    # Validate required fields
+    required_fields = ['id', 'email', 'name']
+    for field in required_fields:
+        if not user_data.get(field):
+            error_msg = f"Missing required field: {field}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Try to find existing user by Google ID
+    google_id = user_data["id"]
+    existing_user = users_collection.find_one({"_id": google_id})
     
     if existing_user:
-        logger.info(f"User already exists: {user_data.get('email')}")
-        return User(**existing_user)
+        logger.info(f"User already exists: {existing_user.get('email')}")
+        # Update user data
+        update_data = {
+            "$set": {
+                "email": user_data["email"],
+                "name": user_data["name"],
+                "updated_at": datetime.now()
+            }
+        }
+        users_collection.update_one({"_id": google_id}, update_data)
+        updated_user = users_collection.find_one({"_id": google_id})
+        logger.info(f"Updated user data to: {updated_user.get('email')}, {updated_user.get('name')}")
+        return User.model_validate(updated_user)
     
-    # Create new user with 1 free credit
-    logger.info(f"Creating new user with 1 free credit: {user_data.get('email')}")
-    
-    user_create = UserCreate(**user_data)
-    
-    now = datetime.now()
-    new_user = User(
-        id=user_create.id,
-        email=user_create.email,
-        name=user_create.name,
-        available_credits=1,  # Grant 1 free credit on signup
-        total_credits_purchased=0,
-        created_at=now,
-        updated_at=now
-    )
-    
-    # Insert into database
+    logger.info(f"Creating new user with 1 free credit: {user_data['email']}")
     try:
-        await users_collection.insert_one(new_user.dict())
-        logger.info(f"Successfully created user: {new_user.email}")
-        return new_user
+        # Create new user document
+        new_user_doc = {
+            "_id": google_id,  # Use Google ID as MongoDB _id
+            "email": user_data["email"],
+            "name": user_data["name"],
+            "available_credits": 1,  # Give 1 free credit
+            "total_credits_purchased": 0,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
+        }
+        
+        users_collection.insert_one(new_user_doc)
+        created_user = users_collection.find_one({"_id": google_id})
+        if not created_user:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+        return User.model_validate(created_user)
+        
     except Exception as e:
-        logger.error(f"Error creating user: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating user: {str(e)}"
-        )
+        error_msg = f"Error creating user: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
-async def get_user_by_id(users_collection: Collection, user_id: str) -> User:
+def get_user_by_id(users_collection: Collection, user_id: str) -> User:
     """
     Get a user by their ID.
     
@@ -69,7 +76,7 @@ async def get_user_by_id(users_collection: Collection, user_id: str) -> User:
     Raises:
         HTTPException: If user not found
     """
-    user = await users_collection.find_one({"id": user_id})
+    user = users_collection.find_one({"_id": user_id})
     
     if not user:
         logger.error(f"User with ID {user_id} not found")
@@ -78,4 +85,4 @@ async def get_user_by_id(users_collection: Collection, user_id: str) -> User:
             detail="User not found"
         )
     
-    return User(**user) 
+    return User.model_validate(user) 

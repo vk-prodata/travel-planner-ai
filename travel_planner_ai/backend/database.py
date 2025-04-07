@@ -38,13 +38,11 @@ except Exception as e:
 def get_db():
     return db
 
-# Simplified collection access
+def get_user_collection():
+    return users_collection
+
 def get_trips_collection():
     return trips_collection
-
-# Async functions for collection access
-async def get_user_collection():
-    return users_collection
 
 # Example usage in your routes:
 # async def get_user(user_id: str):

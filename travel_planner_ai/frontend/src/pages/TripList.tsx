@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/TripList.css';
 import { notifyError, notifySuccess } from '../services/errorService';
 import LoggingToggle from '../components/LoggingToggle';
+import CreditsDisplay from '../components/CreditsDisplay';
 import { SavedTrip } from '../types';
 
 const TripList: React.FC = () => {
@@ -168,6 +169,7 @@ const TripList: React.FC = () => {
           Travel Planner AI
         </Navbar.Brand>
         <div className="d-flex align-items-center">
+          <CreditsDisplay />
           <LoggingToggle />
           <Button variant="outline-primary" size="sm" onClick={() => navigate('/')} className="ms-2">
             <FaArrowLeft className="me-1" /> Back to Planner

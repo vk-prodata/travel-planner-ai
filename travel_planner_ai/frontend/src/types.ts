@@ -3,6 +3,8 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  availableCredits?: number;
+  totalCreditsPurchased?: number;
 }
 
 export interface LoginData {

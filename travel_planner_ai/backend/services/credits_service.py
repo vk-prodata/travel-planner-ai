@@ -32,12 +32,12 @@ CREDITS_PACKAGES = [
     )
 ]
 
-async def get_credits_packages() -> List[CreditsPackage]:
+def get_credits_packages() -> List[CreditsPackage]:
     """Get the available credits packages"""
     return CREDITS_PACKAGES
 
 
-async def get_package_by_id(package_id: str) -> Optional[CreditsPackage]:
+def get_package_by_id(package_id: str) -> Optional[CreditsPackage]:
     """Get a specific credits package by its ID"""
     for package in CREDITS_PACKAGES:
         if package.id == package_id:
@@ -45,9 +45,9 @@ async def get_package_by_id(package_id: str) -> Optional[CreditsPackage]:
     return None
 
 
-async def get_user_credits(users_collection: Collection, user_id: str) -> Dict[str, Any]:
+def get_user_credits(users_collection: Collection, user_id: str) -> Dict[str, Any]:
     """Get the credits information for a user"""
-    user = await users_collection.find_one({"id": user_id})
+    user = users_collection.find_one({"_id": user_id})
     
     if not user:
         logger.error(f"User with ID {user_id} not found")
@@ -56,18 +56,21 @@ async def get_user_credits(users_collection: Collection, user_id: str) -> Dict[s
             detail="User not found"
         )
     
+    # Return with both naming conventions to support frontend
     return {
         "available_credits": user.get("available_credits", 0),
-        "total_credits_purchased": user.get("total_credits_purchased", 0)
+        "total_credits_purchased": user.get("total_credits_purchased", 0),
+        "availableCredits": user.get("available_credits", 0),
+        "totalCreditsPurchased": user.get("total_credits_purchased", 0)
     }
 
 
-async def add_credits(users_collection: Collection, user_id: str, credits_amount: int) -> Dict[str, Any]:
+def add_credits(users_collection: Collection, user_id: str, credits_amount: int) -> Dict[str, Any]:
     """Add credits to a user's account"""
     logger.info(f"Adding {credits_amount} credits to user {user_id}")
     
     # Get the current user
-    user = await users_collection.find_one({"id": user_id})
+    user = users_collection.find_one({"_id": user_id})
     if not user:
         logger.error(f"User with ID {user_id} not found")
         raise HTTPException(
@@ -79,8 +82,8 @@ async def add_credits(users_collection: Collection, user_id: str, credits_amount
     current_credits = user.get("available_credits", 0)
     total_purchased = user.get("total_credits_purchased", 0)
     
-    result = await users_collection.update_one(
-        {"id": user_id},
+    result = users_collection.update_one(
+        {"_id": user_id},
         {
             "$set": {
                 "available_credits": current_credits + credits_amount,
@@ -98,20 +101,23 @@ async def add_credits(users_collection: Collection, user_id: str, credits_amount
         )
     
     # Get the updated user
-    updated_user = await users_collection.find_one({"id": user_id})
+    updated_user = users_collection.find_one({"_id": user_id})
     
+    # Return with both naming conventions to support frontend
     return {
         "available_credits": updated_user.get("available_credits", 0),
-        "total_credits_purchased": updated_user.get("total_credits_purchased", 0)
+        "total_credits_purchased": updated_user.get("total_credits_purchased", 0),
+        "availableCredits": updated_user.get("available_credits", 0),
+        "totalCreditsPurchased": updated_user.get("total_credits_purchased", 0)
     }
 
 
-async def deduct_credits(users_collection: Collection, user_id: str, credits_amount: int = 1) -> Dict[str, Any]:
+def deduct_credits(users_collection: Collection, user_id: str, credits_amount: int = 1) -> Dict[str, Any]:
     """Deduct credits from a user's account"""
     logger.info(f"Deducting {credits_amount} credits from user {user_id}")
     
     # Get the current user
-    user = await users_collection.find_one({"id": user_id})
+    user = users_collection.find_one({"_id": user_id})
     if not user:
         logger.error(f"User with ID {user_id} not found")
         raise HTTPException(
@@ -129,8 +135,8 @@ async def deduct_credits(users_collection: Collection, user_id: str, credits_amo
         )
     
     # Deduct the credits
-    result = await users_collection.update_one(
-        {"id": user_id},
+    result = users_collection.update_one(
+        {"_id": user_id},
         {
             "$set": {
                 "available_credits": current_credits - credits_amount,
@@ -147,17 +153,20 @@ async def deduct_credits(users_collection: Collection, user_id: str, credits_amo
         )
     
     # Get the updated user
-    updated_user = await users_collection.find_one({"id": user_id})
+    updated_user = users_collection.find_one({"_id": user_id})
     
+    # Return with both naming conventions to support frontend
     return {
         "available_credits": updated_user.get("available_credits", 0),
-        "total_credits_purchased": updated_user.get("total_credits_purchased", 0)
+        "total_credits_purchased": updated_user.get("total_credits_purchased", 0),
+        "availableCredits": updated_user.get("available_credits", 0),
+        "totalCreditsPurchased": updated_user.get("total_credits_purchased", 0)
     }
 
 
-async def create_payment_intent(package_id: str, quantity: int = 1) -> Dict[str, Any]:
+def create_payment_intent(package_id: str, quantity: int = 1) -> Dict[str, Any]:
     """Create a Stripe payment intent for credits purchase"""
-    package = await get_package_by_id(package_id)
+    package = get_package_by_id(package_id)
     if not package:
         logger.error(f"Credits package with ID {package_id} not found")
         raise HTTPException(
@@ -196,7 +205,7 @@ async def create_payment_intent(package_id: str, quantity: int = 1) -> Dict[str,
         )
 
 
-async def verify_payment_intent(payment_intent_id: str) -> Dict[str, Any]:
+def verify_payment_intent(payment_intent_id: str) -> Dict[str, Any]:
     """Verify a Stripe payment intent for credits purchase"""
     try:
         payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
