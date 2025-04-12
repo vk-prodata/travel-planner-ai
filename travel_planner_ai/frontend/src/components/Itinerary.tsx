@@ -1,9 +1,8 @@
-import * as React from 'react';
+import React, { useState } from 'react';
 import { Card, Button, Alert } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
 import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt } from 'react-icons/bs';
-import { FaDollarSign } from 'react-icons/fa';
-import { useState } from 'react';
+import { FaMapMarkerAlt, FaUtensils, FaBed, FaLandmark, FaTheaterMasks, FaInfoCircle, FaExpandAlt, FaCompressAlt, FaWalking, FaClock } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import '../styles/Itinerary.css';
 

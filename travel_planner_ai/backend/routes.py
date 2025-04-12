@@ -14,6 +14,8 @@ from typing import Optional
 from pathlib import Path
 import json
 from pydantic import BaseModel
+from .services.credits_service import deduct_credits
+from .database import get_user_collection
 
 # Set up file logging
 log_dir = Path(__file__).parent.parent / "logs"
@@ -41,12 +43,31 @@ class RefreshActivityRequest(BaseModel):
 async def create_trip(
     trip: TripCreate,
     current_user: dict = Depends(get_current_user),
-    db = Depends(get_db)
+    db = Depends(get_db),
+    users_collection = Depends(get_user_collection)
 ):
     try:
+        # === Add Credit Deduction Logic ===
+        user_id = current_user["id"]
+        try:
+            logger.info(f"[routes.py] Attempting to deduct 1 credit for trip creation from user {user_id}")
+            # Note: deduct_credits is likely sync, so no await needed here
+            credits_result = deduct_credits(users_collection, user_id, 1)
+            logger.info(f"[routes.py] Credit deducted successfully for user {user_id}. Remaining credits: {credits_result.get('available_credits', 'N/A')}")
+        except HTTPException as credit_error:
+             # If deduct_credits raises HTTPException (e.g., insufficient funds)
+             logger.warning(f"[routes.py] Credit deduction failed for user {user_id}: {credit_error.detail}")
+             # Re-raise the exception to send appropriate error response to frontend
+             raise credit_error 
+        except Exception as e:
+             # Catch any other unexpected errors during credit deduction
+             logger.error(f"[routes.py] Unexpected error during credit deduction for user {user_id}: {str(e)}", exc_info=True)
+             raise HTTPException(status_code=500, detail="An internal error occurred while processing credits.")
+        # === End Credit Deduction Logic ===
+
         logger.info(f"""
         Starting trip creation process:
-        - User: {current_user['email']} (ID: {current_user['id']})
+        - User: {current_user['email']} (ID: {user_id})
         - Destination: {trip.formData.get('destination')}
         - Date Range: {trip.formData.get('startDate')} to {trip.formData.get('endDate')}
         - Has Itinerary: {bool(trip.itinerary)}
@@ -59,7 +80,7 @@ async def create_trip(
         
         # Generate trip hash
         trip_hash = TripHash(
-            userId=current_user['id'],
+            userId=user_id,
             origin=trip.formData.get('origin', ''),
             destination=trip.formData['destination'],
             startDate=trip.formData['startDate'],
@@ -118,7 +139,7 @@ async def create_trip(
             "_id": ObjectId(),
             "id": trip_id,
             "trip_hash": trip_hash,
-            "user_id": current_user['id'],
+            "user_id": user_id,
             "created_at": datetime.now(),
             "updated_at": datetime.now()
         })
@@ -131,7 +152,7 @@ async def create_trip(
         logger.info(f"""
         Creating new trip:
         - Trip ID: {trip_id}
-        - User: {current_user['email']} (ID: {current_user['id']})
+        - User: {current_user['email']} (ID: {user_id})
         - Destination: {trip_dict.get('formData', {}).get('destination')}
         - Created at: {trip_dict['created_at']}
         - Itinerary structure: {list(trip_dict.get('itinerary', {}).keys())}

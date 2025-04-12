@@ -29,6 +29,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [tokenClient, setTokenClient] = useState<any>(null);
 
   useEffect(() => {
+    const tryRestoreSession = async () => {
+      const storedToken = localStorage.getItem('token');
+      const storedEmail = localStorage.getItem('userEmail');
+      const storedUserId = localStorage.getItem('userId');
+
+      if (storedToken && storedEmail && storedUserId) {
+        console.log('Restoring session for:', storedEmail);
+        try {
+          const creditsData = await getUserCredits(storedUserId);
+          const restoredUser: User = {
+            id: storedUserId,
+            email: storedEmail,
+            name: localStorage.getItem('userName') || '',
+            availableCredits: creditsData.availableCredits !== undefined 
+                                ? creditsData.availableCredits 
+                                : creditsData.available_credits || 0,
+            totalCreditsPurchased: creditsData.totalCreditsPurchased !== undefined
+                                     ? creditsData.totalCreditsPurchased
+                                     : creditsData.total_credits_purchased || 0,
+          };
+          setUser(restoredUser);
+          console.log('Session restored successfully', restoredUser);
+        } catch (error) {
+          console.error('Failed to restore session (token likely invalid or user fetch failed):', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('userEmail');
+          localStorage.removeItem('userId');
+          localStorage.removeItem('userName');
+          setUser(null);
+        } finally {
+          loadGoogleScript();
+        }
+      } else {
+         console.log('No stored session found.');
+         loadGoogleScript();
+      }
+    };
+
     const loadGoogleScript = () => {
       const script = document.createElement('script');
       script.src = 'https://accounts.google.com/gsi/client';
@@ -59,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       document.head.appendChild(script);
     };
 
-    loadGoogleScript();
+    tryRestoreSession();
   }, []);
 
   const handleCredentialResponse = async (response: any) => {
@@ -99,9 +137,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData);
       console.log('User state set:', userData);
 
-      // Store the token
+      // Store the token, email, ID, and name
       localStorage.setItem('token', token);
       localStorage.setItem('userEmail', userData.email);
+      localStorage.setItem('userId', userData.id);
+      localStorage.setItem('userName', userData.name || '');
       console.log('Saved auth data to localStorage');
     } catch (error) {
       console.error('Error handling credential:', error);
@@ -160,9 +200,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(userData);
             console.log('User state set:', userData);
 
-            // Store the token
+            // Store the token, email, ID, and name
             localStorage.setItem('token', token);
             localStorage.setItem('userEmail', userData.email);
+            localStorage.setItem('userId', userData.id);
+            localStorage.setItem('userName', userData.name || '');
             console.log('Saved auth data to localStorage');
             
             resolve();
@@ -185,17 +227,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return new Promise((resolve) => {
         window.google.accounts.oauth2.revoke(user?.email || '', () => {
           setUser(null);
-          // Remove user data from localStorage
+          // Remove all user data from localStorage
           localStorage.removeItem('token');
           localStorage.removeItem('userEmail');
+          localStorage.removeItem('userId');
+          localStorage.removeItem('userName');
           resolve();
         });
       });
     } else {
       setUser(null);
-      // Remove user data from localStorage
+      // Remove all user data from localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('userEmail');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userName');
       return Promise.resolve();
     }
   };

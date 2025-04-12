@@ -24,8 +24,8 @@ CREDITS_PACKAGES = [
         is_popular=False
     ),
     CreditsPackage(
-        id="value",
-        name="Value Package",
+        id="premium",
+        name="Premium Package",
         credits=100,
         price=39.99,
         is_popular=True
@@ -47,32 +47,34 @@ def get_package_by_id(package_id: str) -> Optional[CreditsPackage]:
 
 def get_user_credits(users_collection: Collection, user_id: str) -> Dict[str, Any]:
     """Get the credits information for a user"""
+    logger.debug(f"Attempting to fetch credits for user_id: {user_id}")
     user = users_collection.find_one({"_id": user_id})
     
     if not user:
-        logger.error(f"User with ID {user_id} not found")
+        logger.info(f"User {user_id} not found in DB while fetching credits.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
     
-    # Return with both naming conventions to support frontend
-    return {
+    credits_info = {
         "available_credits": user.get("available_credits", 0),
         "total_credits_purchased": user.get("total_credits_purchased", 0),
         "availableCredits": user.get("available_credits", 0),
         "totalCreditsPurchased": user.get("total_credits_purchased", 0)
     }
+    logger.info(f"Successfully fetched credits for user_id {user_id}: {credits_info}")
+    return credits_info
 
 
 def add_credits(users_collection: Collection, user_id: str, credits_amount: int) -> Dict[str, Any]:
     """Add credits to a user's account"""
-    logger.info(f"Adding {credits_amount} credits to user {user_id}")
+    logger.info(f"Attempting to add {credits_amount} credits to user {user_id}")
     
     # Get the current user
     user = users_collection.find_one({"_id": user_id})
     if not user:
-        logger.error(f"User with ID {user_id} not found")
+        logger.error(f"User with ID {user_id} not found when trying to add credits.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
@@ -81,45 +83,56 @@ def add_credits(users_collection: Collection, user_id: str, credits_amount: int)
     # Update the credits
     current_credits = user.get("available_credits", 0)
     total_purchased = user.get("total_credits_purchased", 0)
+    new_available = current_credits + credits_amount
+    new_total_purchased = total_purchased + credits_amount
+    
+    logger.debug(f"User {user_id} current credits: {current_credits}, total purchased: {total_purchased}. Adding {credits_amount}.")
     
     result = users_collection.update_one(
         {"_id": user_id},
         {
             "$set": {
-                "available_credits": current_credits + credits_amount,
-                "total_credits_purchased": total_purchased + credits_amount,
+                "available_credits": new_available,
+                "total_credits_purchased": new_total_purchased,
                 "updated_at": datetime.now()
             }
         }
     )
     
     if result.modified_count == 0:
-        logger.error(f"Failed to update credits for user {user_id}")
+        logger.error(f"MongoDB update operation modified 0 documents for user {user_id} when adding credits.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update user credits"
+            detail="Failed to update user credits in database"
         )
     
-    # Get the updated user
+    # Get the updated user to confirm and return new values
     updated_user = users_collection.find_one({"_id": user_id})
-    
-    # Return with both naming conventions to support frontend
-    return {
+    if not updated_user:
+         logger.error(f"User {user_id} disappeared after successful credit update?!")
+         raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user after updating credits"
+         )
+
+    updated_credits_info = {
         "available_credits": updated_user.get("available_credits", 0),
         "total_credits_purchased": updated_user.get("total_credits_purchased", 0),
         "availableCredits": updated_user.get("available_credits", 0),
         "totalCreditsPurchased": updated_user.get("total_credits_purchased", 0)
     }
+    logger.info(f"Successfully added {credits_amount} credits to user {user_id}. New info: {updated_credits_info}")
+    return updated_credits_info
 
 
 def deduct_credits(users_collection: Collection, user_id: str, credits_amount: int = 1) -> Dict[str, Any]:
     """Deduct credits from a user's account"""
-    logger.info(f"Deducting {credits_amount} credits from user {user_id}")
+    logger.info(f"Attempting to deduct {credits_amount} credits from user {user_id}")
     
     # Get the current user
     user = users_collection.find_one({"_id": user_id})
     if not user:
-        logger.error(f"User with ID {user_id} not found")
+        logger.error(f"User with ID {user_id} not found when trying to deduct credits.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
@@ -127,41 +140,50 @@ def deduct_credits(users_collection: Collection, user_id: str, credits_amount: i
     
     # Check if the user has enough credits
     current_credits = user.get("available_credits", 0)
+    logger.debug(f"User {user_id} current credits: {current_credits}. Required: {credits_amount}." )
     if current_credits < credits_amount:
-        logger.error(f"User {user_id} does not have enough credits. Has: {current_credits}, Required: {credits_amount}")
+        logger.warning(f"User {user_id} insufficient credits. Has: {current_credits}, Required: {credits_amount}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Insufficient credits. You need {credits_amount} credits but have {current_credits}."
         )
     
     # Deduct the credits
+    new_available = current_credits - credits_amount
     result = users_collection.update_one(
         {"_id": user_id},
         {
             "$set": {
-                "available_credits": current_credits - credits_amount,
+                "available_credits": new_available,
                 "updated_at": datetime.now()
             }
         }
     )
     
     if result.modified_count == 0:
-        logger.error(f"Failed to deduct credits for user {user_id}")
+        logger.error(f"MongoDB update operation modified 0 documents for user {user_id} when deducting credits.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update user credits"
+            detail="Failed to update user credits in database"
         )
     
     # Get the updated user
     updated_user = users_collection.find_one({"_id": user_id})
-    
-    # Return with both naming conventions to support frontend
-    return {
+    if not updated_user:
+         logger.error(f"User {user_id} disappeared after successful credit deduction?!")
+         raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user after deducting credits"
+         )
+
+    updated_credits_info = {
         "available_credits": updated_user.get("available_credits", 0),
         "total_credits_purchased": updated_user.get("total_credits_purchased", 0),
         "availableCredits": updated_user.get("available_credits", 0),
         "totalCreditsPurchased": updated_user.get("total_credits_purchased", 0)
     }
+    logger.info(f"Successfully deducted {credits_amount} credits from user {user_id}. New info: {updated_credits_info}")
+    return updated_credits_info
 
 
 def create_payment_intent(package_id: str, quantity: int = 1) -> Dict[str, Any]:

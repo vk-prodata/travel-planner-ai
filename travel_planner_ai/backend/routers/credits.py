@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Header, Request
 from ..auth import get_current_user
 from ..database import get_user_collection
 from ..models.user import CreditsPurchase, CreditsPackage, UserResponse
@@ -8,10 +8,13 @@ from ..services.credits_service import (
     add_credits, 
     create_payment_intent,
     verify_payment_intent,
-    get_package_by_id
+    get_package_by_id,
+    CREDITS_PACKAGES # Import this to access package details
 )
 from ..services.user_service import create_user_if_not_exists
+from ..config import settings # Import settings for webhook secret
 import logging
+import stripe # Import stripe library
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -68,12 +71,13 @@ async def get_user_credits_by_id(
     """Get a user's credits information by user ID"""
     logger.info(f"Fetching credits for user ID: {user_id}")
     try:
-        # Check if user exists
-        user = await users_collection.find_one({"_id": user_id})
+        # Use synchronous find_one as get_user_collection likely returns a pymongo collection
+        user = users_collection.find_one({"_id": user_id}) 
         
         if not user:
-            logger.info(f"User {user_id} not found, will be created during Google auth")
-            # Return default credits for new user
+            # Log info instead of error if user not found, as they might be new
+            logger.info(f"User {user_id} not found in DB. Returning default credits.")
+            # Return default credits for potential new user (consistent with auth flow)
             return {
                 "available_credits": 1,  # Default free credit
                 "total_credits_purchased": 0,
@@ -90,7 +94,8 @@ async def get_user_credits_by_id(
         }
             
     except Exception as e:
-        logger.error(f"Error getting user credits: {str(e)}")
+        # Log the specific error and user ID
+        logger.error(f"Error getting credits for user_id {user_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting user credits: {str(e)}"
@@ -111,8 +116,12 @@ async def purchase_credits(
     packageId: str = Body(...),
     users_collection = Depends(get_user_collection)
 ):
-    """Process a direct credits purchase (for testing only)"""
-    logger.info(f"Processing direct credits purchase for user {userId} with package {packageId}")
+    """
+    Process a direct credits purchase. 
+    WARNING: This endpoint bypasses Stripe and directly adds credits. 
+    It should ONLY be used for testing or administrative purposes.
+    """
+    logger.warning(f"Initiating DIRECT credits purchase (bypassing Stripe) for user {userId}, package {packageId}.")
     
     # Get the package to determine credit amount
     package = get_package_by_id(packageId)
@@ -247,10 +256,106 @@ async def purchase_credits_with_payment(
             detail=f"Error adding credits: {str(e)}"
         )
 
+@router.post("/credits/webhook")
+async def stripe_webhook(
+    request: Request, 
+    stripe_signature: str = Header(None),
+    users_collection = Depends(get_user_collection)
+):
+    """Handle incoming Stripe webhooks for payment events (e.g., checkout completion)"""
+    logger.info("Received Stripe webhook event")
+    payload = await request.body()
+    endpoint_secret = settings.stripe_webhook_secret
+    # Add Debug logs
+    logger.debug(f"Attempting to verify webhook signature. Header: {stripe_signature}")
+    logger.debug(f"Using webhook secret (from settings): {endpoint_secret[:5]}...{endpoint_secret[-5:]}") # Log partial secret
+
+    if not endpoint_secret:
+        logger.error("Stripe webhook secret is not configured.")
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+    if not stripe_signature:
+         logger.error("Missing Stripe-Signature header")
+         raise HTTPException(status_code=400, detail="Missing Stripe-Signature header")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, stripe_signature, endpoint_secret
+        )
+        logger.info(f"Successfully constructed Stripe event: type={event['type']}, id={event['id']}")
+    except ValueError as e:
+        # Invalid payload
+        logger.error(f"Invalid webhook payload: {e}")
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        logger.error(f"Invalid webhook signature: {e}")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        logger.error(f"Error constructing webhook event: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Webhook error")
+
+    # Handle the checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        logger.info(f"Processing checkout.session.completed: session_id={session.get('id')}")
+        
+        # Extract necessary data from the session object
+        client_reference_id = session.get('client_reference_id') # Expected to be the user_id
+        payment_status = session.get('payment_status')
+        metadata = session.get('metadata', {})
+        # Assuming package_id and credits are stored in metadata during checkout creation (which needs to be implemented if using stripe hosted checkout)
+        # Alternatively, derive from line_items if possible or lookup based on price id
+        # For now, let's assume client_reference_id is our user_id
+
+        if payment_status == 'paid' and client_reference_id:
+            logger.info(f"Checkout session {session.get('id')} paid. Client reference ID (user_id): {client_reference_id}")
+
+            # Determine credits to add
+            # This part is tricky with direct Stripe links. The links provided don't seem to pass metadata easily.
+            # Option 1: Embed user_id in the success URL and have the frontend call a specific endpoint.
+            # Option 2: Rely on webhook metadata (if Stripe links can be configured to pass it, e.g., client_reference_id).
+            # Option 3: Match the 'price' ID from line_items (if available) to your packages.
+            
+            # --- TEMPORARY WORKAROUND: Adding fixed credits based on amount --- 
+            # This is NOT robust. We should ideally link the checkout session back to the specific package.
+            amount_total = session.get('amount_total') # Amount in cents
+            credits_to_add = 0
+            package_name = "Unknown"
+            if amount_total == 499: # Corresponds to $4.99 Basic package
+                credits_to_add = 10
+                package_name = "Basic"
+            elif amount_total == 3999: # Corresponds to $39.99 Premium package
+                credits_to_add = 100
+                package_name = "Premium"
+            else:
+                logger.warning(f"Unrecognized amount {amount_total} for session {session.get('id')}. Cannot determine credits.")
+
+            if credits_to_add > 0:
+                try:
+                    logger.info(f"Attempting to add {credits_to_add} credits ({package_name} package) to user {client_reference_id}")
+                    updated_credits_info = add_credits(users_collection, client_reference_id, credits_to_add)
+                    logger.info(f"Successfully added {credits_to_add} credits to user {client_reference_id}. New balance: {updated_credits_info}")
+                except HTTPException as http_exc:
+                     logger.error(f"HTTPException while adding credits for user {client_reference_id} from webhook: {http_exc.detail}", exc_info=True)
+                     # Don't raise HTTP error to Stripe, acknowledge receipt but log failure
+                except Exception as e:
+                    logger.error(f"Failed to add credits for user {client_reference_id} from webhook: {e}", exc_info=True)
+                    # Don't raise HTTP error to Stripe, acknowledge receipt but log failure
+            else:
+                 logger.warning(f"No credits added for session {session.get('id')} due to unrecognized amount or missing data.")
+
+        else:
+            logger.warning(f"Checkout session {session.get('id')} status not 'paid' or missing client_reference_id. Status: {payment_status}, UserID: {client_reference_id}")
+
+    else:
+        logger.info(f"Received unhandled event type: {event['type']}")
+
+    return {"status": "success"} # Return 200 OK to Stripe
+
 @router.get("/credits/public-key", response_model=Dict[str, str])
 async def get_stripe_public_key():
     """Get the Stripe publishable key"""
-    from ..config import settings
     return {"publishable_key": settings.stripe_publishable_key}
 
 @router.post("/credits/update-user", response_model=Dict[str, Any])

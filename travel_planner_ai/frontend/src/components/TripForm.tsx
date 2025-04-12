@@ -1,8 +1,8 @@
-import * as React from 'react';
-import { useState } from 'react';
-import { Form, Button, Row, Col, Badge, OverlayTrigger, Tooltip, Accordion, Alert } from 'react-bootstrap';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useForm, Controller, SubmitHandler } from 'react-hook-form';
+import { Form, Button, Row, Col, Spinner, Alert, OverlayTrigger, Tooltip, Accordion, Badge } from 'react-bootstrap';
+import { FaPlaneDeparture, FaPlaneArrival, FaCalendarAlt, FaUsers, FaUtensils, FaHotel, FaLandmark, FaTheaterMasks, FaInfoCircle, FaPlus } from 'react-icons/fa';
 import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType } from '../types';
-import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 
 interface TripFormProps {
   onSubmit: (data: TripFormData) => void;

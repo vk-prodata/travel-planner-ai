@@ -23,33 +23,6 @@ export const getUserCredits = async (userId: string) => {
   }
 };
 
-export const purchaseCredits = async (userId: string, packageId: string) => {
-  try {
-    console.log(`Purchasing credits for user ID: ${userId}, package: ${packageId}`);
-    const response = await fetch(`${API_BASE_URL}/credits/purchase`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        packageId,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Error response:', errorData);
-      throw new Error(`Failed to purchase credits: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error purchasing credits:', error);
-    throw error;
-  }
-};
-
 // For future Stripe implementation
 export const createPaymentIntent = async (packageId: string, quantity: number = 1) => {
   try {

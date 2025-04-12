@@ -6,6 +6,9 @@ const DETAILED_ERROR_EMAIL = 'vkusa87@gmail.com';
 // Store state for whether detailed logging is enabled
 let isDetailedLoggingEnabled = false;
 
+// You can adjust the threshold for showing detailed errors
+const REPORTING_THRESHOLD = 500; // Only report 5xx errors by default
+
 /**
  * Notify user of an error with special handling for specific users
  * @param error The error object or message
@@ -73,9 +76,13 @@ export const isDetailedLogging = (): boolean => {
   return isDetailedLoggingEnabled;
 };
 
-export default {
+const errorService = {
   notifyError,
   notifySuccess,
   toggleDetailedLogging,
-  isDetailedLogging
-}; 
+  isDetailedLogging,
+  REPORTING_THRESHOLD
+};
+
+// Assign to variable before default export
+export default errorService; 

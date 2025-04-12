@@ -5,6 +5,7 @@ from ..models import TripCreate, TripUpdate
 from bson import ObjectId
 import logging
 import datetime
+from ..services.credits_service import deduct_credits
 
 logger = logging.getLogger(__name__)
 
@@ -154,15 +155,23 @@ async def create_trip(
         logger.info(f"Creating trip for user: {current_user['email']}")
         logger.debug(f"Trip data received: {trip_data}")
         
-        # Check if user has enough credits
-        from ..services.credits_service import deduct_credits
+        # === Add Credit Deduction Logic ===
         user_id = current_user["id"]
-        
-        # Deduct 1 credit for trip creation (this will also check if they have enough credits)
-        logger.info(f"Checking and deducting credits for user {user_id}")
-        credits_result = await deduct_credits(users_collection, user_id, 1)
-        logger.info(f"Credits deducted. Remaining credits: {credits_result['available_credits']}")
-        
+        try:
+            logger.info(f"Attempting to deduct 1 credit for trip creation from user {user_id}")
+            credits_result = deduct_credits(users_collection, user_id, 1)
+            logger.info(f"Credit deducted successfully for user {user_id}. Remaining credits: {credits_result.get('available_credits', 'N/A')}")
+        except HTTPException as credit_error:
+             # If deduct_credits raises HTTPException (e.g., insufficient funds)
+             logger.warning(f"Credit deduction failed for user {user_id}: {credit_error.detail}")
+             # Re-raise the exception to send appropriate error response to frontend
+             raise credit_error 
+        except Exception as e:
+             # Catch any other unexpected errors during credit deduction
+             logger.error(f"Unexpected error during credit deduction for user {user_id}: {str(e)}", exc_info=True)
+             raise HTTPException(status_code=500, detail="An internal error occurred while processing credits.")
+        # === End Credit Deduction Logic ===
+
         # Convert Pydantic model to dict and add user_id
         trip_dict = trip_data.dict()
         trip_dict["user_id"] = user_id

@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Row, Col, Card, Button, Alert, Navbar, Spinner } from 'react-bootstrap';
 import { FaCoins, FaArrowLeft, FaPlane } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserCredits, purchaseCredits, CREDIT_PACKAGES } from '../services/creditsService';
-import { notifyError, notifySuccess } from '../services/errorService';
+import { getUserCredits, CREDIT_PACKAGES } from '../services/creditsService';
+import { notifyError } from '../services/errorService';
 import LoggingToggle from '../components/LoggingToggle';
 import '../styles/Credits.css';
 
 const Credits: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableCredits, setAvailableCredits] = useState(0);
   
@@ -44,35 +44,48 @@ const Credits: React.FC = () => {
       }
     };
     
-    fetchCredits();
-  }, [user]);
-  
-  const handlePurchase = async (packageId: string) => {
-    if (!user) return;
-    
-    try {
-      setPurchasing(true);
-      setError(null);
-      
-      console.log(`Purchasing package ${packageId} for user ${user.id}`);
-      const result = await purchaseCredits(user.id, packageId);
-      console.log('Purchase result:', result);
-      
-      // Handle both naming conventions from backend
-      setAvailableCredits(
-        result.availableCredits !== undefined 
-          ? result.availableCredits 
-          : result.available_credits || 0
-      );
-      
-      notifySuccess('Credits purchased successfully!');
-    } catch (err) {
-      console.error('Failed to purchase credits:', err);
-      setError('Failed to purchase credits. Please try again later.');
-      notifyError(err, user?.email);
-    } finally {
-      setPurchasing(false);
+    const queryParams = new URLSearchParams(location.search);
+    const purchaseStatus = queryParams.get('purchase');
+
+    if (user && purchaseStatus === 'success') {
+      console.log('Detected purchase success, fetching updated credits...');
+      navigate(location.pathname, { replace: true });
+      fetchCredits();
+    } else if (user) {
+      fetchCredits();
+    } else {
+      setLoading(false);
     }
+  }, [user, location.search, navigate]);
+  
+  const handleStripeRedirect = (packageId: string) => {
+    if (!user) {
+      setError('You must be logged in to purchase credits.');
+      return;
+    }
+
+    // Get link from environment variables based on package ID
+    let stripeLink: string | undefined;
+    if (packageId === 'basic') {
+      stripeLink = process.env.REACT_APP_STRIPE_LINK_BASIC;
+    } else if (packageId === 'premium') { // Check for 'premium' ID from frontend package list
+      stripeLink = process.env.REACT_APP_STRIPE_LINK_PREMIUM;
+    } else {
+      // Handle potential future packages or log an error
+      console.error(`No Stripe link configured for package ID: ${packageId}`);
+    }
+
+    if (!stripeLink) {
+      setError('Sorry, this purchase option is currently unavailable. Please check configuration.');
+      console.error('Stripe link environment variable not found or invalid for packageId:', packageId);
+      return;
+    }
+
+    // Construct the redirect URL with user info
+    const redirectUrl = `${stripeLink}?client_reference_id=${encodeURIComponent(user.id)}&prefilled_email=${encodeURIComponent(user.email)}`;
+    
+    console.log(`Redirecting user ${user.email} to Stripe for package ${packageId}: ${redirectUrl}`);
+    window.location.href = redirectUrl;
   };
   
   if (!user) {
@@ -169,17 +182,9 @@ const Credits: React.FC = () => {
                       <Button 
                         variant="primary" 
                         className="w-100" 
-                        onClick={() => handlePurchase(pkg.id)}
-                        disabled={purchasing}
+                        onClick={() => handleStripeRedirect(pkg.id)}
                       >
-                        {purchasing ? (
-                          <>
-                            <Spinner size="sm" animation="border" className="me-2" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>Purchase</>
-                        )}
+                        Purchase
                       </Button>
                     </Card.Body>
                   </Card>
