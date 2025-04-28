@@ -167,7 +167,14 @@ const Itinerary: React.FC<ItineraryProps> = ({
                         <div className="activity-description">
                           {isMeal 
                             ? formatMealDescription(activity.description)
-                            : activity.description
+                            : (
+                                <>
+                                  {activity.description}
+                                  {activity.why && (
+                                    <span className="activity-why">{activity.why}</span>
+                                  )}
+                                </>
+                              )
                           }
                           
                           {activity.location && (

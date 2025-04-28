@@ -18,8 +18,22 @@
 }
 
 .itinerary .activity-description {
-  margin-bottom: 10px;
-  line-height: 1.5;
+  margin: 0.5rem 0;
+  color: #333;
+}
+
+.itinerary .activity-why {
+  display: block;
+  margin-top: 0.5rem;
+  color: #666;
+  font-style: italic;
+}
+
+.itinerary .activity-why::before {
+  content: "Why: ";
+  font-weight: bold;
+  font-style: normal;
+  color: #333;
 }
 
 .itinerary .activity-location {

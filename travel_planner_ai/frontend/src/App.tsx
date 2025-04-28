@@ -20,7 +20,9 @@ import LoggingToggle from './components/LoggingToggle';
 import { notifyError, notifySuccess } from './services/errorService';
 import { generateItinerary } from './services/itineraryService';
 import './styles/App.css';
+import FaqPage from './pages/FaqPage/FaqPage';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
     .split(' ')
@@ -60,7 +62,7 @@ const MainApp = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
   const [formData, setFormData] = useState<TripFormData | null>(null);
@@ -207,8 +209,14 @@ const MainApp = () => {
 
       const newItinerary = await generateItinerary(data, user.id);
       if (newItinerary) {
-        setItinerary(newItinerary);
-        setLocalItinerary(newItinerary);
+        // Ensure the isOwner flag is set
+        const itineraryWithOwnership = {
+          ...newItinerary,
+          isOwner: true // User is always the owner of a newly generated itinerary
+        };
+        
+        setItinerary(itineraryWithOwnership);
+        setLocalItinerary(itineraryWithOwnership);
         
         // Auto-save the trip
         try {
@@ -218,7 +226,7 @@ const MainApp = () => {
               ...data,
               updateExisting: true // Always try to update if exists
             },
-            itinerary: newItinerary
+            itinerary: itineraryWithOwnership
           };
           
           const savedTrip = await saveTrip(tripData);
@@ -250,7 +258,7 @@ const MainApp = () => {
                   ...data,
                   updateExisting: true
                 },
-                itinerary: newItinerary
+                itinerary: itineraryWithOwnership
               };
               
               const savedTrip = await saveTrip(tripData);
@@ -602,31 +610,73 @@ const MainApp = () => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleGenerateItinerary = async () => {
+    try {
+      if (!formData) {
+        return;
+      }
+
+      setIsLoading(true);
+      setItinerary(null);
+      
+      // Clear any cached search params to avoid confusion
+      setSearchParams({});
+      
+      const generatedItinerary = await generateItinerary(formData, user?.id || 'anonymous');
+      
+      // Ensure the isOwner flag is set for new itineraries
+      const itineraryWithOwnership = {
+        ...generatedItinerary,
+        isOwner: true // User is always the owner of a newly generated itinerary
+      };
+      
+      setItinerary(itineraryWithOwnership);
+      setLocalItinerary(itineraryWithOwnership);
+      setHasUnsavedChanges(true);
+      
+      // Reset any existing trip ID since this is a new itinerary
+      setCurrentTripId(null);
+      
+      notifySuccess('Itinerary generated successfully!');
+      
+    } catch (error) {
+      console.error('Failed to generate itinerary:', error);
+      notifyError(error instanceof Error ? error.message : 'Failed to generate itinerary', user?.email);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Container fluid className="p-0 min-vh-100 d-flex flex-column">
       <Row className="g-0">
         <Col md={4} className="border-end shadow-sm order-2 order-md-1" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
           <div className="p-2">
             <div className="bg-light p-2 rounded shadow-sm">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <div className="d-flex align-items-center">
-                  <FaPlaneDeparture className="me-2 text-secondary" size={20} />
-                  <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
-                </div>
+              <div className="d-flex justify-content-end align-items-center mb-3">
                 <div className="d-flex align-items-center">
                   <LoggingToggle />
                   {!user ? (
                     <AuthForm />
                   ) : (
-                    <div className="d-flex">
+                    <div className="d-flex flex-wrap align-items-center gap-2">
                       <CreditsDisplay />
                       <Button 
                         variant="outline-primary" 
                         size="sm" 
                         onClick={() => navigate('/trips')}
-                        className="rounded-pill mx-2"
+                        className="rounded-pill"
                       >
                         <FaList className="me-1" /> My Trips
+                      </Button>
+                      <Button 
+                        variant="outline-primary"
+                        size="sm" 
+                        onClick={() => navigate('/faq')}
+                        className="rounded-pill"
+                      >
+                        FAQ
                       </Button>
                       <Button 
                         variant="outline-danger" 
@@ -638,6 +688,12 @@ const MainApp = () => {
                       </Button>
                     </div>
                   )}
+                </div>
+              </div>
+              <div className="mb-4">
+                <div className="d-flex align-items-center">
+                  <FaPlaneDeparture className="me-2 text-secondary" size={20} />
+                  <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
                 </div>
               </div>
               <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
@@ -822,6 +878,7 @@ const App = () => {
         <Route path="/" element={<MainApp />} />
         <Route path="/trips" element={<TripList />} />
         <Route path="/credits" element={<Credits />} />
+        <Route path="/faq" element={<FaqPage />} />
       </Routes>
     </Router>
   );

@@ -319,6 +319,10 @@ async def generate_itinerary(
             logger.info(f"Successfully formatted itinerary for {current_user.get('email')}")
             logger.debug(f"Final formatted itinerary: {json.dumps(itinerary, indent=2)}")
             
+            # Add tripId and isOwner flag
+            itinerary['tripId'] = f"temp-{datetime.now().timestamp()}"
+            itinerary['isOwner'] = True
+            
             return {
                 "success": True,
                 "itinerary": itinerary

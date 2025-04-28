@@ -22,8 +22,14 @@ class TripDetails(BaseModel):
     intermediate_stops: Optional[List[str]] = []
 
 class Activity(BaseModel):
+    id: str
     time: str
     description: str
+    type: str
+    location: Optional[str] = None
+    coordinates: Optional[str] = None
+    priceLevel: Optional[str] = None
+    why: Optional[str] = None
 
 class DailyItinerary(BaseModel):
     date: date

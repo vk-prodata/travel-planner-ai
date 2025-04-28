@@ -107,3 +107,34 @@
 - Created utility endpoints and scripts for manual user data updates
 - Added comprehensive logging to track user data updates
 - Ensured proper merging of user data while preserving credits information 
+
+# Progress
+
+- Created FAQ page frontend components (`FaqPage.js`, `ContactForm.js`).
+- Added route `/faq` in `App.tsx`.
+- Added basic FAQ content.
+- Implemented collapsible contact form.
+- Added basic integration test for `FaqPage`.
+- Added FAQ link to the main navigation header in `App.tsx`.
+- Adjusted header layout in `App.tsx` to place title and buttons on separate rows.
+- Added header structure to `FaqPage.js`.
+- Rearranged `App.tsx` header: buttons first, title second.
+- Changed FAQ and Credits button/badge colors to blue variants.
+- Changed FAQ and Credits button/badge colors to match 'My Trips' button style (`outline-primary` and `bg="primary"`).
+- Moved 'Contact Us' button to `FaqPage` header, integrated form logic into `FaqPage`, removed `ContactForm` component.
+
+# Decisions
+
+- Used a simple custom accordion for FAQs.
+- Mocked the contact form submission for now.
+- Added basic bootstrap styling.
+- Added FAQ link within the existing sidebar header, not a full-width top bar.
+- Aligned header control buttons to the right on their own row.
+- Used `outline-primary` for FAQ button and `bg="primary"` for Credits badge.
+- Contact form is now managed directly within `FaqPage` for simplicity.
+
+# Next Steps
+
+- Implement backend endpoint for contact form email submission.
+- Connect frontend form to backend endpoint.
+- Run tests. 

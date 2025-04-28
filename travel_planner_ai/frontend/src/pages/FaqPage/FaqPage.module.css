@@ -1,0 +1,15 @@
+.faqSection {
+  margin-bottom: 1.5rem;
+}
+
+.faqQuestion {
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.faqAnswer {
+  padding-left: 1rem;
+  border-left: 2px solid #eee;
+  margin-bottom: 1rem;
+} 

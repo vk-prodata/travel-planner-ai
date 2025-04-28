@@ -25,6 +25,7 @@ export interface Activity {
   location?: string;
   coordinates?: string;
   priceLevel?: PriceLevel;
+  why?: string;
 }
 
 export interface Day {

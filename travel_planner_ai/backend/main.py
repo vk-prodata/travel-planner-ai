@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from travel_planner_ai.backend.routes import router as trip_router
 from travel_planner_ai.backend.routers.trips import router as trips_router
 from travel_planner_ai.backend.routers.credits import router as credits_router
+from travel_planner_ai.backend.routers.contact import router as contact_router
 from .config.logging_config import setup_logging
 from .auth import get_current_user
 from .database import get_user_collection
@@ -47,6 +48,7 @@ app.add_middleware(
 app.include_router(trip_router)    # No prefix for routes to match frontend calls
 app.include_router(trips_router)   # No prefix since it already includes "/trips" in routes
 app.include_router(credits_router) # Include the new credits router
+app.include_router(contact_router) # Include the contact router
 
 logger.info("Routers configured and ready")
 

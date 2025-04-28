@@ -23,8 +23,8 @@ const CreditsDisplay: React.FC = () => {
       }
     >
       <Badge 
-        bg="warning" 
-        text="dark" 
+        bg="primary"
+        text="light"
         className="d-flex align-items-center px-2 py-1 cursor-pointer"
         style={{ cursor: 'pointer' }}
         onClick={() => navigate('/credits')}
