@@ -5,7 +5,7 @@ from ..models import TripCreate, TripUpdate
 from bson import ObjectId
 import logging
 import datetime
-from ..services.credits_service import deduct_credits
+from ..services.credits_service import deduct_credits, deduct_credits_for_trip
 
 logger = logging.getLogger(__name__)
 
@@ -155,23 +155,27 @@ async def create_trip(
         logger.info(f"Creating trip for user: {current_user['email']}")
         logger.debug(f"Trip data received: {trip_data}")
         
-        # === Add Credit Deduction Logic ===
+        # Check if the trip already has an itinerary, which would indicate 
+        # credits were already deducted during itinerary generation
+        should_deduct_credits = True
+        if hasattr(trip_data, "itinerary") and trip_data.itinerary and trip_data.itinerary.get("days"):
+            days_count = len(trip_data.itinerary.get("days", []))
+            if days_count > 0:
+                logger.info(f"Trip already has an itinerary with {days_count} days, skipping credit deduction")
+                should_deduct_credits = False
+        
+        # Deduct credits based on trip days only if needed
         user_id = current_user["id"]
-        try:
-            logger.info(f"Attempting to deduct 1 credit for trip creation from user {user_id}")
-            credits_result = deduct_credits(users_collection, user_id, 1)
-            logger.info(f"Credit deducted successfully for user {user_id}. Remaining credits: {credits_result.get('available_credits', 'N/A')}")
-        except HTTPException as credit_error:
-             # If deduct_credits raises HTTPException (e.g., insufficient funds)
-             logger.warning(f"Credit deduction failed for user {user_id}: {credit_error.detail}")
-             # Re-raise the exception to send appropriate error response to frontend
-             raise credit_error 
-        except Exception as e:
-             # Catch any other unexpected errors during credit deduction
-             logger.error(f"Unexpected error during credit deduction for user {user_id}: {str(e)}", exc_info=True)
-             raise HTTPException(status_code=500, detail="An internal error occurred while processing credits.")
-        # === End Credit Deduction Logic ===
-
+        if should_deduct_credits:
+            try:
+                credits_result = deduct_credits_for_trip(users_collection, user_id, trip_data)
+                logger.info(f"Credits deducted successfully for user {user_id}. Remaining credits: {credits_result.get('available_credits', 'N/A')}")
+            except HTTPException as credit_error:
+                # Re-raise the exception to send appropriate error response to frontend
+                raise credit_error
+        else:
+            logger.info(f"Skipping credit deduction for user {user_id} as they likely already paid for itinerary generation")
+            
         # Convert Pydantic model to dict and add user_id
         trip_dict = trip_data.dict()
         trip_dict["user_id"] = user_id

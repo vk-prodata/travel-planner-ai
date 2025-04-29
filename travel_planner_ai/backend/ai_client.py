@@ -8,6 +8,7 @@ from cachetools import TTLCache, cached
 from travel_planner_ai.backend.models import TripRequest
 from dotenv import load_dotenv
 import re
+from datetime import datetime
 
 load_dotenv()  # Load environment variables from a .env file
 
@@ -113,77 +114,98 @@ def generate_ai_prompt(trip_data):
     """
     Generate a detailed prompt for the AI based on the trip request data.
     """
-    # Extract trip details
-    destination = trip_data.get('destination', '')
-    start_date = trip_data.get('startDate', '')
-    end_date = trip_data.get('endDate', '')
-    travel_type = trip_data.get('travelType', '')
-    adults = trip_data.get('adults', 1)
-    children = trip_data.get('children', 0)
-    infants = trip_data.get('infants', 0)
-    budget_level = trip_data.get('budgetLevel', 'medium')
-    preferences = trip_data.get('entertainmentPreferences', [])
     language = trip_data.get('language', 'en')
-    cuisine_preference = trip_data.get('cuisinePreference', 'any')
-    
-    # Map language codes to full language names for clearer instructions
-    language_names = {
-        'en': 'English',
-        'es': 'Spanish',
-        'fr': 'French',
-        'de': 'German',
-        'it': 'Italian',
-        'ru': 'Russian',
-        'zh': 'Chinese'
-    }
-    
-    language_name = language_names.get(language, 'English')
 
-    # Build cuisine instruction based on preference
-    cuisine_instruction = ""
-    if cuisine_preference != 'any':
-        if cuisine_preference == 'local':
-            cuisine_instruction = "Focus on authentic local and traditional restaurants of the region. "
-        elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
-            cuisine_instruction = f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
-        elif cuisine_preference == 'international':
-            cuisine_instruction = "Suggest a diverse mix of international restaurants representing various world cuisines. "
-        elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai']:
-            cuisine_instruction = f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
+    # Format dates for better readability in the prompt
+    start_date_obj = datetime.fromisoformat(trip_data['startDate'])
+    end_date_obj = datetime.fromisoformat(trip_data['endDate'])
     
-    # Build the prompt
-    prompt = (
-        f"Generate a detailed travel itinerary in {language_name} language for a trip to {destination} "
-        f"from {start_date} to {end_date}. "
-        f"Travel type: {travel_type}. "
-        f"Group: {adults} adults, {children} children, {infants} infants. "
-        f"Budget level: {budget_level}. "
-        f"Entertainment preferences: {', '.join(preferences)}. "
-        f"\n\nIMPORTANT: The entire itinerary must be written in {language_name} language. "
-        f"{cuisine_instruction}"
-        f"For each meal suggestion, provide 2-3 specific restaurant names with a brief description of each, including their signature dishes or specialties. "
-        f"For each activity, include specific locations and venues rather than generic suggestions. "
-        f"When possible, include the exact name of attractions, parks, museums, etc. "
-        f"Format the response as a JSON object with the following structure:\n"
-        f"{{\n"
-        f"  \"days\": [\n"
-        f"    {{\n"
-        f"      \"date\": \"YYYY-MM-DD\",\n"
-        f"      \"activities\": [\n"
-        f"        {{\n"
-        f"          \"time\": \"HH:MM AM/PM\",\n"
-        f"          \"description\": \"Detailed description in {language_name}\",\n"
-        f"          \"type\": \"activity/meal/transport\",\n"
-        f"          \"location\": \"Name of the place\",\n"
-        f"          \"coordinates\": \"latitude,longitude\" (if available)\n"
-        f"        }}\n"
-        f"      ]\n"
-        f"    }}\n"
-        f"  ]\n"
-        f"}}"
-    )
+    # Calculate duration for the AI
+    delta = (end_date_obj - start_date_obj).days + 1  # +1 to make it inclusive
     
-    return prompt
+    formatted_start = start_date_obj.strftime('%Y-%m-%d')
+    formatted_end = end_date_obj.strftime('%Y-%m-%d')
+    
+    logger.info(f"Generating prompt for trip from {formatted_start} to {formatted_end} ({delta} days)")
+
+    user_prompt = f"""
+    Generate a detailed travel itinerary for a trip to {trip_data['destination']} from {formatted_start} to {formatted_end} ({delta} days inclusive).
+    
+    ### IMPORTANT FORMAT INSTRUCTIONS ###
+    - You MUST create an itinerary for EVERY DAY from {formatted_start} to {formatted_end} inclusive, with no days missing
+    - Your response must strictly follow the [DAY_START] and [ACTIVITY_START] format
+    - Date format must be YYYY-MM-DD (e.g., {formatted_start})
+    - Include at least 5 activities per day (morning, lunch, afternoon, dinner, evening)
+    - Start each day with a [DAY_START] tag
+    - Start each activity with an [ACTIVITY_START] tag
+    - Time format should be like "9:00 AM - 10:30 AM"
+    - Coordinates must be in decimal format (e.g., "47.6062 N, 122.3321 W")
+    - Include realistic restaurant names for meals
+    - For food activities, mention signature dishes in description
+    
+    ### TRAVELER DETAILS ###
+    - Budget: {trip_data.get('budget', 'moderate')}
+    - Trip type: {trip_data.get('tripType', 'leisure')}
+    - Number of travelers: {trip_data.get('numberOfTravelers', 1)}
+    """.strip()
+
+    if trip_data.get('interests'):
+        user_prompt += f"\n- Interests: {', '.join(trip_data['interests'])}"
+
+    if trip_data.get('cuisinePreferences'):
+        user_prompt += f"\n- Cuisine preferences: {', '.join(trip_data['cuisinePreferences'])}"
+
+    if trip_data.get('accommodationType'):
+        user_prompt += f"\n- Accommodation type: {trip_data['accommodationType']}"
+
+    if trip_data.get('transportation'):
+        user_prompt += f"\n- Transportation: {trip_data['transportation']}"
+
+    if trip_data.get('accessibility'):
+        user_prompt += f"\n- Accessibility needs: {trip_data['accessibility']}"
+
+    if trip_data.get('intermediateStops'):
+        stops = '; '.join([f"{stop['location']} on {stop['date']}" for stop in trip_data['intermediateStops']])
+        user_prompt += f"\n\n### INTERMEDIATE STOPS ###\nInclude these locations on the specified dates:\n{stops}"
+
+    user_prompt += f"""
+    
+    ### OUTPUT FORMAT FOR EACH DAY ###
+    [DAY_START]
+    Date: YYYY-MM-DD
+    
+    [ACTIVITY_START]
+    Time: HH:MM AM/PM - HH:MM AM/PM
+    Type: (travel, food, activity, sightseeing, accommodation)
+    Location: Name of place
+    Coordinates: XX.XXXX N, YY.YYYY E
+    Description: Detailed description of the activity
+    Why: Why this activity was chosen based on the traveler preferences
+    Price: (free, $, $$, $$$)
+    """
+
+    # Add language instruction if not English
+    if language != 'en':
+        user_prompt += f"\n\nPlease generate the itinerary in {get_language_name(language)}."
+
+    system_prompt = """
+    You are an expert travel planner AI. Your job is to create detailed, personalized travel itineraries based on user preferences.
+    
+    Follow these requirements strictly:
+    1. Include exact dates for each day using YYYY-MM-DD format
+    2. Provide real, researched places and attractions
+    3. Be specific with restaurant names, not generic like "Local Restaurant"
+    4. Include specific foods/dishes for restaurants
+    5. Provide accurate coordinates for all locations
+    6. Ensure the entire date range requested is covered with no missing days
+    7. Follow the required output format precisely with all required tags
+    8. Maintain consistent formatting throughout the itinerary
+    
+    The itinerary should be practical and follow a logical flow throughout each day and the overall trip.
+    """
+
+    logger.info(f"Generated prompt for {trip_data['destination']} trip in {language}")
+    return system_prompt.strip(), user_prompt
 
 async def call_openai_api(prompt):
     """
@@ -282,7 +304,10 @@ def create_fallback_itinerary(trip_data):
     end_date = datetime.strptime(trip_data.get('endDate', '2023-01-03'), '%Y-%m-%d')
     cuisine_preference = trip_data.get('cuisinePreference', 'any')
     
+    # Calculate the total days for the trip (inclusive)
     days = (end_date - start_date).days + 1
+    logger.info(f"Creating fallback itinerary for {days} days from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    
     itinerary = {"days": []}
     
     # Process intermediate stops if available
@@ -324,9 +349,11 @@ def create_fallback_itinerary(trip_data):
             }.get(cuisine_preference, cuisine_preference)
             return f"{meal_type} at an authentic {cuisine_display} restaurant in {location}"
     
+    # Ensure we generate an itinerary for every day in the date range
     for day in range(days):
         current_date = start_date + timedelta(days=day)
         current_date_str = current_date.strftime('%Y-%m-%d')
+        logger.debug(f"Creating activities for day {day+1}/{days}: {current_date_str}")
         
         # Check if this day is at an intermediate stop
         location = trip_data.get('destination')
@@ -393,4 +420,5 @@ def create_fallback_itinerary(trip_data):
             "activities": day_activities
         })
     
+    logger.info(f"Fallback itinerary created with {len(itinerary['days'])} days")
     return itinerary

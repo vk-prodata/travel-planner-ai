@@ -58,7 +58,7 @@ const SignInPrompt: React.FC = () => (
 );
 
 const MainApp = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUserCredits } = useAuth();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const location = useLocation();
@@ -218,6 +218,16 @@ const MainApp = () => {
         setItinerary(itineraryWithOwnership);
         setLocalItinerary(itineraryWithOwnership);
         
+        // Refresh user credits after generating itinerary
+        if (user) {
+          try {
+            await refreshUserCredits();
+            console.log('User credits refreshed after generating itinerary');
+          } catch (err) {
+            console.error('Failed to refresh credits after generating itinerary:', err);
+          }
+        }
+        
         // Auto-save the trip
         try {
           const tripData = {
@@ -235,6 +245,14 @@ const MainApp = () => {
           notifySuccess('Trip generated and saved successfully!');
           // Update URL without redirecting
           window.history.replaceState(null, '', `/?tripId=${savedTrip.id}`);
+          
+          // Refresh user credits after auto-saving trip
+          try {
+            await refreshUserCredits();
+            console.log('User credits refreshed after auto-saving trip');
+          } catch (err) {
+            console.error('Failed to refresh credits after auto-saving trip:', err);
+          }
         } catch (saveError: any) {
           console.error('Error saving trip:', saveError);
           setHasUnsavedChanges(true);
@@ -266,6 +284,14 @@ const MainApp = () => {
               setHasUnsavedChanges(false);
               notifySuccess('Existing trip updated successfully!');
               window.history.replaceState(null, '', `/?tripId=${savedTrip.id}`);
+              
+              // Refresh user credits after updating existing trip
+              try {
+                await refreshUserCredits();
+                console.log('User credits refreshed after updating existing trip');
+              } catch (err) {
+                console.error('Failed to refresh credits after updating existing trip:', err);
+              }
             } catch (updateError) {
               console.error('Error updating trip:', updateError);
               setHasUnsavedChanges(true);
@@ -293,8 +319,10 @@ const MainApp = () => {
     if (!formData) return 'New Trip';
     
     const destination = formData.destination;
-    const startDate = formData.startDate ? new Date(formData.startDate).toLocaleDateString() : '';
-    const endDate = formData.endDate ? new Date(formData.endDate).toLocaleDateString() : '';
+    
+    // Get dates directly from formData to avoid any timezone issues
+    const startDate = formData.startDate || '';
+    const endDate = formData.endDate || '';
     
     let title = destination;
     if (startDate && endDate) {
@@ -397,6 +425,18 @@ const MainApp = () => {
           console.log('New trip created with ID:', savedTrip.id);
           setCurrentTripId(savedTrip.id);
           notifySuccess('Trip saved successfully!');
+          
+          // Refresh user credits after saving a new trip
+          // Only refresh if this is a new trip (might deduct credits)
+          if (user) {
+            try {
+              await refreshUserCredits();
+              console.log('User credits refreshed after saving trip');
+            } catch (err) {
+              console.error('Failed to refresh credits after saving trip:', err);
+            }
+          }
+          
         } catch (error: any) {
           // If we get a 409 conflict error, ask the user if they want to update the existing trip
           if (error.message && error.message.includes('similar trip already exists')) {

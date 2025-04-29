@@ -2,6 +2,19 @@
 
 ## Progress Updates
 
+### Credit System Improvements - [Current Date]
+
+- Updated credit system to use day-based deduction (1 credit per day in the trip)
+- Increased free credits for new users from 1 to 10 credits
+- Updated credit packages: Basic package now gives 30 credits (was 10), Premium package gives 300 credits (was 100)
+- Maintained same pricing: Basic $4.99, Premium $39.99
+- Added deduct_credits_for_trip function to calculate credits based on trip duration
+- Fixed double credit deduction issue when saving a trip with an existing itinerary
+- Added logic to check if a trip already has an itinerary before deducting credits
+- Updated both routes.py and routers/trips.py to use consistent credit deduction
+- Implemented proper logging for credit deduction operations
+- Added error handling for credit deduction failures
+
 ### Trip List Page Implementation - [Date]
 
 - Created a new TripList page component that displays all trips for a user

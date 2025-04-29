@@ -14,7 +14,7 @@ from typing import Optional
 from pathlib import Path
 import json
 from pydantic import BaseModel
-from .services.credits_service import deduct_credits
+from .services.credits_service import deduct_credits, deduct_credits_for_trip
 from .database import get_user_collection
 
 # Set up file logging
@@ -47,24 +47,26 @@ async def create_trip(
     users_collection = Depends(get_user_collection)
 ):
     try:
-        # === Add Credit Deduction Logic ===
+        # Check if we need to deduct credits
         user_id = current_user["id"]
-        try:
-            logger.info(f"[routes.py] Attempting to deduct 1 credit for trip creation from user {user_id}")
-            # Note: deduct_credits is likely sync, so no await needed here
-            credits_result = deduct_credits(users_collection, user_id, 1)
-            logger.info(f"[routes.py] Credit deducted successfully for user {user_id}. Remaining credits: {credits_result.get('available_credits', 'N/A')}")
-        except HTTPException as credit_error:
-             # If deduct_credits raises HTTPException (e.g., insufficient funds)
-             logger.warning(f"[routes.py] Credit deduction failed for user {user_id}: {credit_error.detail}")
-             # Re-raise the exception to send appropriate error response to frontend
-             raise credit_error 
-        except Exception as e:
-             # Catch any other unexpected errors during credit deduction
-             logger.error(f"[routes.py] Unexpected error during credit deduction for user {user_id}: {str(e)}", exc_info=True)
-             raise HTTPException(status_code=500, detail="An internal error occurred while processing credits.")
-        # === End Credit Deduction Logic ===
-
+        should_deduct_credits = True
+        
+        # If the trip already has an itinerary, assume credits were already deducted during itinerary generation
+        if trip.itinerary and trip.itinerary.get('days') and len(trip.itinerary.get('days', [])) > 0:
+            logger.info(f"[routes.py] Trip already has an itinerary, assuming credits were deducted during generation")
+            should_deduct_credits = False
+        
+        # Deduct credits only if necessary
+        if should_deduct_credits:
+            try:
+                logger.info(f"[routes.py] Processing credit deduction for user {user_id}")
+                credits_result = deduct_credits(users_collection, user_id, 1)
+                logger.info(f"[routes.py] Credit deduction successful. Remaining credits: {credits_result.get('available_credits', 'N/A')}")
+            except HTTPException as credit_error:
+                # Re-raise the exception to send appropriate error response to frontend
+                logger.warning(f"[routes.py] Credit deduction failed: {credit_error.detail}")
+                raise credit_error
+        
         logger.info(f"""
         Starting trip creation process:
         - User: {current_user['email']} (ID: {user_id})
@@ -278,13 +280,23 @@ async def update_trip(
 @router.post("/generate-itinerary")
 async def generate_itinerary(
     trip_request: TripCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    users_collection = Depends(get_user_collection)
 ):
     try:
         logger.info(f"Generating itinerary for user {current_user['id']} ({current_user.get('email')})")
         
         # Log request data
         logger.info(f"Request data: {json.dumps(trip_request.formData, indent=2)}")
+        
+        # Deduct credits based on trip days
+        user_id = current_user["id"]
+        try:
+            credits_result = deduct_credits_for_trip(users_collection, user_id, trip_request)
+            logger.info(f"Credits deducted for itinerary generation. Remaining: {credits_result.get('available_credits', 'N/A')}")
+        except HTTPException as credit_error:
+            # Re-raise the exception to send appropriate error response to frontend
+            raise credit_error
 
         # Generate itinerary using AI
         try:

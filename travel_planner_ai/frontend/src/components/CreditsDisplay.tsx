@@ -17,8 +17,11 @@ const CreditsDisplay: React.FC = () => {
       placement="bottom"
       overlay={
         <Tooltip id="credits-tooltip">
-          You have {availableCredits} credit{availableCredits !== 1 ? 's' : ''} available.
-          Click to manage or purchase more.
+          <div className="text-start">
+            <div>You have {availableCredits} credit{availableCredits !== 1 ? 's' : ''} available.</div>
+            <div className="mt-1">Each day of a trip uses 1 credit.</div>
+            <div className="mt-1">Click to manage or purchase more.</div>
+          </div>
         </Tooltip>
       }
     >

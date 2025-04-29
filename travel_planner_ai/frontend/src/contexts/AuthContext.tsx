@@ -7,6 +7,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUserCredits: () => Promise<void>;
 }
 
 // Create context with default values
@@ -14,7 +15,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signIn: async () => {},
-  signOut: async () => {}
+  signOut: async () => {},
+  refreshUserCredits: async () => {}
 });
 
 declare global {
@@ -246,8 +248,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Function to refresh user credits
+  const refreshUserCredits = async (): Promise<void> => {
+    if (!user) return;
+    
+    try {
+      console.log(`Refreshing credits for user: ${user.email}`);
+      const creditsData = await getUserCredits(user.id);
+      
+      // Update user object with fresh credit data
+      setUser(prevUser => {
+        if (!prevUser) return null;
+        
+        return {
+          ...prevUser,
+          availableCredits: creditsData.availableCredits !== undefined 
+                            ? creditsData.availableCredits 
+                            : creditsData.available_credits || 0,
+          totalCreditsPurchased: creditsData.totalCreditsPurchased !== undefined
+                                ? creditsData.totalCreditsPurchased
+                                : creditsData.total_credits_purchased || 0,
+        };
+      });
+      
+      console.log('User credits refreshed successfully');
+    } catch (error) {
+      console.error('Failed to refresh user credits:', error);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshUserCredits }}>
       {!loading && children}
     </AuthContext.Provider>
   );

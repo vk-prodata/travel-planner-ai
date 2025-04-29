@@ -38,14 +38,14 @@ def create_user_if_not_exists(users_collection: Collection, user_data: dict) -> 
         logger.info(f"Updated user data to: {updated_user.get('email')}, {updated_user.get('name')}")
         return User.model_validate(updated_user)
     
-    logger.info(f"Creating new user with 1 free credit: {user_data['email']}")
+    logger.info(f"Creating new user with 10 free credits: {user_data['email']}")
     try:
         # Create new user document
         new_user_doc = {
             "_id": google_id,  # Use Google ID as MongoDB _id
             "email": user_data["email"],
             "name": user_data["name"],
-            "available_credits": 1,  # Give 1 free credit
+            "available_credits": 10,  # Give 10 free credits
             "total_credits_purchased": 0,
             "created_at": datetime.now(),
             "updated_at": datetime.now()

@@ -165,6 +165,18 @@ const Credits: React.FC = () => {
               </Card.Body>
             </Card>
             
+            <Card className="mb-4">
+              <Card.Body>
+                <Card.Title>How Credits Work</Card.Title>
+                <ul className="mt-3">
+                  <li>Each day of your travel itinerary costs 1 credit</li>
+                  <li>A 7-day trip will use 7 credits</li>
+                  <li>Credits are deducted when you generate an itinerary</li>
+                  <li>If you save a previously generated itinerary, no additional credits are used</li>
+                </ul>
+              </Card.Body>
+            </Card>
+            
             <h2 className="mb-3">Purchase Credits</h2>
             <Row>
               {CREDIT_PACKAGES.map(pkg => (

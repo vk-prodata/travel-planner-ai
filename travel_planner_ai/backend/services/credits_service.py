@@ -19,14 +19,14 @@ CREDITS_PACKAGES = [
     CreditsPackage(
         id="basic",
         name="Basic Package",
-        credits=10,
+        credits=30,
         price=4.99,
         is_popular=False
     ),
     CreditsPackage(
         id="premium",
         name="Premium Package",
-        credits=100,
+        credits=300,
         price=39.99,
         is_popular=True
     )
@@ -250,4 +250,78 @@ def verify_payment_intent(payment_intent_id: str) -> Dict[str, Any]:
         return {
             "verified": False,
             "error": str(e)
-        } 
+        }
+
+
+def deduct_credits_for_trip(users_collection: Collection, user_id: str, trip_data) -> Dict[str, Any]:
+    """
+    Deduct credits based on trip duration (number of days).
+    This consolidates the credit deduction logic used across multiple routers.
+    
+    Args:
+        users_collection: MongoDB collection for users
+        user_id: User ID to deduct credits from
+        trip_data: Trip data containing either itinerary.days or formData with date range
+        
+    Returns:
+        Dict with updated credit information
+        
+    Raises:
+        HTTPException: If user not found or has insufficient credits
+    """
+    logger.info(f"Calculating credit deduction for trip by user {user_id}")
+    
+    # Calculate credits to deduct based on days count
+    days_count = 0
+    
+    # Try to get days from itinerary if it exists
+    if hasattr(trip_data, 'itinerary') and trip_data.itinerary:
+        itinerary = trip_data.itinerary
+        if isinstance(itinerary, dict) and "days" in itinerary:
+            days_count = len(itinerary["days"])
+    
+    # If no days are in the itinerary yet, try to calculate from form data
+    if days_count == 0 and hasattr(trip_data, 'formData') and trip_data.formData:
+        form_data = trip_data.formData
+        if "startDate" in form_data and "endDate" in form_data:
+            try:
+                from datetime import datetime
+                start_date = datetime.fromisoformat(form_data["startDate"].replace("Z", "+00:00"))
+                end_date = datetime.fromisoformat(form_data["endDate"].replace("Z", "+00:00"))
+                
+                # Calculate inclusive days without adding extra day
+                # For example: Jan 1 to Jan 7 is 7 days, not 8
+                delta = end_date - start_date
+                days_count = delta.days
+                
+                # Only add 1 if start_date and end_date are the same day
+                if days_count == 0:
+                    days_count = 1
+                    
+                logger.info(f"Calculated {days_count} days for trip from {start_date.date()} to {end_date.date()}")
+            except Exception as e:
+                logger.error(f"Error calculating trip duration from dates: {str(e)}")
+                days_count = 1  # Default to 1 day if calculation fails
+        elif "tripDuration" in form_data:
+            try:
+                days_count = int(form_data["tripDuration"])
+            except (ValueError, TypeError):
+                days_count = 1
+    
+    # Ensure minimum of 1 day for credit purposes
+    days_count = max(1, days_count)
+    
+    try:
+        logger.info(f"Deducting {days_count} credits for {days_count}-day trip from user {user_id}")
+        return deduct_credits(users_collection, user_id, days_count)
+    except HTTPException as credit_error:
+        # Re-raise the HTTPException
+        logger.warning(f"Credit deduction failed for user {user_id}: {credit_error.detail}")
+        raise credit_error
+    except Exception as e:
+        # Log and wrap any other exceptions
+        logger.error(f"Unexpected error during credit deduction for user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred while processing credits."
+        ) 

@@ -78,7 +78,7 @@ class BaseAIClient:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a travel planning assistant. Create detailed itineraries with specific times and activities. Always use the exact format specified in the prompt."
+                            "content": "You are a travel planning assistant. Create detailed itineraries with specific times and activities. Use the exact format specified in the prompt."
                         },
                         {
                             "role": "user",
@@ -268,14 +268,40 @@ class BaseAIClient:
                     activity_dict['location'] = location_match.group(1).strip()
                     
                     # Extract coordinates if present
-                    coords_match = re.search(r'Coordinates: ([+-]?\d+\.?\d*)[°]?\s*[NS]?,\s*([+-]?\d+\.?\d*)[°]?\s*[EW]?', activity)
+                    coords_match = re.search(r'Coordinates: (.+?)(?=\n|$)', activity)
                     if coords_match:
-                        lat = float(coords_match.group(1))
-                        lon = float(coords_match.group(2))
-                        activity_dict['coordinates'] = {
-                            'latitude': lat,
-                            'longitude': lon
-                        }
+                        coords_text = coords_match.group(1).strip()
+                        # Try different coordinate patterns
+                        patterns = [
+                            # Standard format: "12.345 N, 67.890 E"
+                            r'([+-]?\d+\.?\d*)\s*[°]?\s*[NSns]?,\s*([+-]?\d+\.?\d*)\s*[°]?\s*[EWew]?',
+                            # Alternative format: "12.345, 67.890"
+                            r'([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)',
+                            # Flexible format with any separator
+                            r'([+-]?\d+\.?\d*)[^0-9+-]+([+-]?\d+\.?\d*)'
+                        ]
+                        
+                        valid_coords = False
+                        for pattern in patterns:
+                            coords = re.search(pattern, coords_text, re.IGNORECASE)
+                            if coords:
+                                try:
+                                    lat = float(coords.group(1))
+                                    lon = float(coords.group(2))
+                                    # Validate coordinate ranges
+                                    if -90 <= lat <= 90 and -180 <= lon <= 180:
+                                        valid_coords = True
+                                        activity_dict['coordinates'] = {
+                                            'latitude': lat,
+                                            'longitude': lon
+                                        }
+                                        logger.info(f"Extracted coordinates: {lat}, {lon}")
+                                        break
+                                except (ValueError, IndexError):
+                                    continue
+                        
+                        if not valid_coords:
+                            logger.warning(f"Could not extract valid coordinates from: '{coords_text}'")
                     
                     # Extract description and why section
                     desc_match = re.search(r'Description: (.*?)(?=\nWhy:|$)', activity, re.DOTALL)
@@ -396,15 +422,35 @@ class BaseAIClient:
                         return False
 
                     # Validate coordinates format if present
-                    coords_match = re.search(r'Coordinates: .+', activity)
+                    coords_match = re.search(r'Coordinates: (.+?)(?=\n|$)', activity)
                     if coords_match:
-                        # Allow both decimal format and degree format
-                        valid_coords = re.search(
-                            r'Coordinates: ([+-]?\d+\.?\d*)[°]?\s*[NS]?,\s*([+-]?\d+\.?\d*)[°]?\s*[EW]?',
-                            activity
-                        )
+                        coords_text = coords_match.group(1).strip()
+                        # Try different coordinate patterns
+                        patterns = [
+                            # Standard format: "12.345 N, 67.890 E"
+                            r'([+-]?\d+\.?\d*)\s*[°]?\s*[NSns]?,\s*([+-]?\d+\.?\d*)\s*[°]?\s*[EWew]?',
+                            # Alternative format: "12.345, 67.890"
+                            r'([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)',
+                            # Flexible format with any separator
+                            r'([+-]?\d+\.?\d*)[^0-9+-]+([+-]?\d+\.?\d*)'
+                        ]
+                        
+                        valid_coords = False
+                        for pattern in patterns:
+                            coords = re.search(pattern, coords_text, re.IGNORECASE)
+                            if coords:
+                                try:
+                                    lat = float(coords.group(1))
+                                    lon = float(coords.group(2))
+                                    # Validate coordinate ranges
+                                    if -90 <= lat <= 90 and -180 <= lon <= 180:
+                                        valid_coords = True
+                                        break
+                                except (ValueError, IndexError):
+                                    continue
+                        
                         if not valid_coords:
-                            logger.error("Invalid coordinates format")
+                            logger.error(f"Invalid coordinates format: '{coords_text}'")
                             return False
 
             return True

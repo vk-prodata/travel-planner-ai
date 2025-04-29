@@ -54,14 +54,14 @@ export const CREDIT_PACKAGES = [
   {
     id: 'basic',
     name: 'Basic',
-    credits: 10,
+    credits: 30,
     price: 4.99,
     currency: 'USD',
   },
   {
     id: 'premium',
     name: 'Premium',
-    credits: 100,
+    credits: 300,
     price: 39.99,
     currency: 'USD',
   },
