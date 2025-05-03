@@ -7,7 +7,7 @@ from datetime import datetime
 from bson import ObjectId
 import logging
 import uuid
-from .ai.base_client import BaseAIClient
+from .ai_client import AIClient
 from .config.ai_config import get_model_config
 import os
 from typing import Optional
@@ -32,7 +32,7 @@ logger.addHandler(file_handler)
 router = APIRouter()
 
 # Initialize AI client
-ai_client = BaseAIClient(api_key=os.getenv("OPENAI_API_KEY"))
+ai_client = AIClient(api_key=os.getenv("OPENAI_API_KEY"))
 
 class RefreshActivityRequest(BaseModel):
     day_index: int
@@ -400,13 +400,15 @@ async def refresh_activity(
         Time: {request.activity.get('time')}
         Type: {activity_type}
         Description: (new activity description)
-        Location: (specific place name)
-        Coordinates: (latitude,longitude if available)
+        Why: Explanation of why this activity is recommended
+        Price: free|$|$$|$$$
+        Location: Specific place name
+        Coordinates: latitude,longitude (if available)
         [ACTIVITY_END]
 
         Rules:
         1. Keep the same time slot: {request.activity.get('time')}
-        2. Keep similar type of activity
+        2. Keep similar type of activity and use the same responselanguage
         3. Make it family-friendly and engaging
         4. Include specific details and locations
         5. For the Location field, provide the exact name of the place (restaurant, museum, park, etc.)
@@ -427,7 +429,7 @@ async def refresh_activity(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided. For meal activities, always suggest 2-3 specific restaurant options with brief descriptions."
+                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided. It should be the same city as the original activity. For meal activities, always suggest 2-3 specific restaurant options with brief descriptions."
                     },
                     {
                         "role": "user",

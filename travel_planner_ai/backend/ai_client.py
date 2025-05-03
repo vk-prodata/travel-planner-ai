@@ -5,10 +5,16 @@ import openai
 import logging
 from functools import wraps
 from cachetools import TTLCache, cached
-from travel_planner_ai.backend.models import TripRequest
 from dotenv import load_dotenv
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+import uuid
+from langdetect import detect
+from functools import wraps
+from typing import Dict, Any, Optional
+import hashlib
+from openai import AsyncOpenAI
+from travel_planner_ai.backend.config.ai_config import AI_CONFIG, get_model_config
 
 load_dotenv()  # Load environment variables from a .env file
 
@@ -129,24 +135,17 @@ def generate_ai_prompt(trip_data):
     logger.info(f"Generating prompt for trip from {formatted_start} to {formatted_end} ({delta} days)")
 
     user_prompt = f"""
-    Generate a detailed travel itinerary for a trip to {trip_data['destination']} from {formatted_start} to {formatted_end} ({delta} days inclusive).
-    
-    ### IMPORTANT FORMAT INSTRUCTIONS ###
-    - You MUST create an itinerary for EVERY DAY from {formatted_start} to {formatted_end} inclusive, with no days missing
-    - Your response must strictly follow the [DAY_START] and [ACTIVITY_START] format
-    - Date format must be YYYY-MM-DD (e.g., {formatted_start})
-    - Include at least 5 activities per day (morning, lunch, afternoon, dinner, evening)
-    - Start each day with a [DAY_START] tag
-    - Start each activity with an [ACTIVITY_START] tag
-    - Time format should be like "9:00 AM - 10:30 AM"
-    - Coordinates must be in decimal format (e.g., "47.6062 N, 122.3321 W")
-    - Include realistic restaurant names for meals
-    - For food activities, mention signature dishes in description
-    
-    ### TRAVELER DETAILS ###
-    - Budget: {trip_data.get('budget', 'moderate')}
-    - Trip type: {trip_data.get('tripType', 'leisure')}
-    - Number of travelers: {trip_data.get('numberOfTravelers', 1)}
+    Create a detailed travel itinerary in {language} for a trip from {formatted_start} to {formatted_end}. Calculate the total number of days and provide a full plan for EACH day.
+    Trip Details:
+    - From: {trip_data.get('origin')}
+    - To: {trip_data.get('destination')}
+    - Dates: {formatted_start} to {formatted_end}
+    - Activities Time: from 9 AM to 6 PM
+    - Travel Type: {trip_data.get('travelType', 'leisure')}
+    - Number of travelers: {trip_data.get('adults')} adults, {trip_data.get('children')} children, {trip_data.get('infants')} infants
+    - Budget Level: {trip_data.get('budgetLevel', 'moderate')}
+    - Entertainment Preferences: {', '.join(trip_data.get('entertainmentPreferences', []))}
+    - Cuisine Preference: {trip_data.get('cuisinePreference', 'any')}
     """.strip()
 
     if trip_data.get('interests'):
@@ -170,18 +169,39 @@ def generate_ai_prompt(trip_data):
 
     user_prompt += f"""
     
-    ### OUTPUT FORMAT FOR EACH DAY ###
+    OUTPUT REQUIREMENTS (VERY IMPORTANT):
+    - Use the EXACT format below for each activity.
+    - Write ALL content in {language.upper()}.
+    - YOU MUST PROVIDE FULL DETAILS FOR EVERY SINGLE DAY from {formatted_start} to {formatted_end} inclusive. 
+    - DO NOT SUMMARIZE. DO NOT SKIP DAYS. The final output MUST contain a [DAY_START]...[DAY_END] block for each date in the range.
+
+    FORMAT:
     [DAY_START]
     Date: YYYY-MM-DD
-    
     [ACTIVITY_START]
     Time: HH:MM AM/PM - HH:MM AM/PM
-    Type: (travel, food, activity, sightseeing, accommodation)
-    Location: Name of place
-    Coordinates: XX.XXXX N, YY.YYYY E
-    Description: Detailed description of the activity
-    Why: Why this activity was chosen based on the traveler preferences
-    Price: (free, $, $$, $$$)
+    Type: travel|food|activity|sightseeing|accommodation
+    Description: Detailed activity description (IN {language.upper()})
+    Why: Explanation of why this activity is recommended (IN {language.upper()})
+    Price: free|$|$$|$$$
+    Location: Specific place name
+    Coordinates: latitude,longitude (if available)
+    [ACTIVITY_END]
+    ... (more activities for the day)
+    [DAY_END]
+
+    RULES:
+    1. Write ALL content in {language.upper()}.
+    2. Generate full, detailed activities for EVERY DAY requested. No summaries.
+    3. Start activities no earlier than 9:00 AM.
+    4. End activities no later than 7:00 PM.
+    5. Include lunch breaks between 12:00 PM and 2:00 PM.
+    6. Each activity should be 1-3 hours long.
+    7. Use the EXACT format shown above (DAY_START, ACTIVITY_START, etc.).
+    8. Include 3-6 activities per day.
+    9. For intermediate stops, use the EXACT dates provided.
+    10. Always include price levels (free, $, $$, $$$).
+    11. Include "Why" sections explaining activity choices based on preferences.
     """
 
     # Add language instruction if not English
@@ -297,9 +317,6 @@ def create_fallback_itinerary(trip_data):
     """
     Create a fallback itinerary when the AI response cannot be parsed.
     """
-    from datetime import datetime, timedelta
-    import uuid
-    
     start_date = datetime.strptime(trip_data.get('startDate', '2023-01-01'), '%Y-%m-%d')
     end_date = datetime.strptime(trip_data.get('endDate', '2023-01-03'), '%Y-%m-%d')
     cuisine_preference = trip_data.get('cuisinePreference', 'any')
@@ -422,3 +439,429 @@ def create_fallback_itinerary(trip_data):
     
     logger.info(f"Fallback itinerary created with {len(itinerary['days'])} days")
     return itinerary
+
+def ai_model_decorator(model: str = None):
+    """Decorator to specify which model to use for the API call"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            original_model = self.model
+            if model:
+                self.model = model
+            # Remove model from kwargs if present
+            kwargs.pop('model', None)
+            result = await func(self, *args, **kwargs)
+            self.model = original_model
+            return result
+        return wrapper
+    return decorator
+
+class AIClient:
+    def __init__(self, api_key: str = None, cache_ttl: int = 3600):
+        """
+        Initialize the AI client with caching
+        
+        Args:
+            api_key: OpenAI API key (defaults to environment variable)
+            cache_ttl: Cache time-to-live in seconds (default: 1 hour)
+        """
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            raise ValueError("OpenAI API key must be provided either directly or via OPENAI_API_KEY environment variable")
+            
+        self.client = AsyncOpenAI(api_key=self.api_key)
+        self.model = AI_CONFIG["default_model"] # Use default from config
+        self.cache = TTLCache(maxsize=500, ttl=cache_ttl)
+        
+    def _generate_cache_key(self, prompt_args: Dict[str, Any]) -> str:
+        """Generate a unique cache key from the prompt arguments"""
+        # Sort the dictionary to ensure consistent hashing
+        sorted_args = json.dumps(prompt_args, sort_keys=True)
+        return hashlib.sha256(sorted_args.encode()).hexdigest()
+    
+    def _log_api_call(self, prompt_args: Dict[str, Any], is_cached: bool):
+        """Log API call details"""
+        logger.info(
+            f"[AI-CALL] {datetime.now().isoformat()} - "
+            f"Model: {self.model}, "
+            f"Cached: {is_cached}, "
+            f"Args: {json.dumps(prompt_args, sort_keys=True)[:100]}..."
+        )
+
+    def clear_cache_for_request(self, trip_request):
+        """Clear the cache for a specific trip request"""
+        key = self._generate_cache_key(trip_request)
+        if key in self.cache:
+            del self.cache[key]
+            logger.info(f"Cache cleared for request: {key}")
+            return True
+        return False
+
+    def is_cached(self, trip_request):
+        """Check if a response for this trip request is already cached"""
+        key = self._generate_cache_key(trip_request)
+        return key in self.cache
+
+    @ai_model_decorator()
+    async def generate_itinerary(self, trip_request: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate a travel itinerary based on the provided arguments"""
+        try:
+            cache_key = self._generate_cache_key(trip_request)
+            
+            if cache_key in self.cache:
+                self._log_api_call(trip_request, is_cached=True)
+                return self.cache[cache_key]
+            
+            prompt = self._generate_prompt(trip_request)
+            
+            logger.info(f"Sending request to OpenAI with model {self.model}")
+            logger.debug(f"Prompt: {prompt}")
+            
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a travel planning assistant. Create detailed itineraries with specific times and activities. Use the exact format specified in the prompt."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    **get_model_config(self.model) # Use model-specific config
+                )
+                
+                if not response or not response.choices or not response.choices[0].message:
+                    raise ValueError("Invalid response from OpenAI API")
+                    
+                logger.info("Received response from OpenAI")
+                logger.debug(f"Raw response: {response}")
+                
+                content = response.choices[0].message.content
+                if not content:
+                    raise ValueError("Empty response from OpenAI API")
+                    
+                itinerary = await self._process_response(content, trip_request)
+                self.cache[cache_key] = itinerary
+                self._log_api_call(trip_request, is_cached=False)
+                
+                return itinerary
+                
+            except Exception as api_error:
+                logger.error(f"OpenAI API error: {str(api_error)}")
+                raise ValueError(f"OpenAI API error: {str(api_error)}") # Keep raising specific error here
+            
+        except Exception as e:
+            logger.error(f"Error generating itinerary with model {self.model}: {str(e)}") # Use error level
+            return self._create_fallback_itinerary(trip_request)
+
+    def _generate_prompt(self, args: Dict[str, Any]) -> str:
+        """Generate a prompt for the AI model"""
+        # Format intermediate stops if they exist
+        intermediate_stops_text = ""
+        if args.get('intermediateStops') and len(args.get('intermediateStops')) > 0:
+            stops = []
+            for stop in args.get('intermediateStops'):
+                stop_text = f"{stop.get('destination')} (arrival: {stop.get('startDate')}, stay: {stop.get('days')} days)"
+                stops.append(stop_text)
+            intermediate_stops_text = (
+                f"\n- Intermediate Stops: {', '.join(stops)}. " # Added newline for clarity
+                "The first Intermediate stop is the first destination."
+            )
+
+        # Build cuisine instruction
+        cuisine_preference = args.get('cuisinePreference', 'any')
+        cuisine_instruction = ""
+        if cuisine_preference != 'any':
+            if cuisine_preference == 'local':
+                cuisine_instruction = "Focus on authentic local and traditional restaurants of the region. "
+            elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
+                cuisine_instruction = f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
+            elif cuisine_preference == 'international':
+                cuisine_instruction = "Suggest a diverse mix of international restaurants representing various world cuisines. "
+            elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai']:
+                cuisine_instruction = f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
+
+        # Handle language
+        language = args.get('language', 'en')
+        language_names = {
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'it': 'Italian',
+            'ru': 'Russian',
+            'zh': 'Chinese'
+        }
+        output_language = language_names.get(language, 'English')
+        
+        return f"""
+    Act as a Travel Planner Assistant. Create a detailed itinerary for a trip from {args.get('startDate')} to {args.get('endDate')}. Provide a full plan for EACH day.
+    Trip Details:
+    - From: {args.get('origin')}
+    - To: {args.get('destination')}
+    - Dates: {args.get('startDate')} to {args.get('endDate')}
+    - Activities Time: from 9 AM to 6 PM
+    - Travel Type: {args.get('travelType')}
+    - Number of travelers: {args.get('adults')} adults, {args.get('children')} children, {args.get('infants')} infants
+    - Budget Level: {args.get('budgetLevel')}
+    - Entertainment Preferences: {', '.join(args.get('entertainmentPreferences', []))}
+    - Cuisine: {cuisine_preference}{intermediate_stops_text}
+
+    OUTPUT REQUIREMENTS MUST BE FOLLOWED:
+    - Use the EXACT format below for each activity.
+    - Write ALL content in {output_language.upper()}.
+    - YOU MUST PROVIDE FULL DETAILS FOR EVERY SINGLE DAY from {args.get('startDate')} to {args.get('endDate')} inclusive. 
+    - DO NOT SUMMARIZE. DO NOT SKIP DAYS. The final output MUST contain a [DAY_START]...[DAY_END] block for each date in the range.
+
+    FORMAT:
+    [DAY_START]
+    Date: YYYY-MM-DD
+    [ACTIVITY_START]
+    Time: HH:MM AM/PM - HH:MM AM/PM
+    Type: travel|food|activity|sightseeing|accommodation
+    Description: Detailed activity description
+    Why: Explanation of why this activity is recommended for the trip requirements
+    Price: free|$|$$|$$$
+    Location: Specific place name
+    Coordinates: latitude,longitude (if available)
+    [ACTIVITY_END]
+    ... (more activities for the day)
+    [DAY_END]
+
+    RULES:
+    1. Write ALL content in {output_language.upper()} - this includes descriptions, explanations, and location names (except where untranslatable)
+    2. Start activities no earlier than 9:00 AM and end no later than 7:00 PM
+    3. Include lunch breaks between 12:00 PM and 2:00 PM. {cuisine_instruction}Suggest 2-3 specific places based on the requirements and take into account the location of activities before and after lunch break.
+    4. Each activity should be 1-3 hours long. If the activity involves a tour/entertainment, be more specific and share 2-3 of the most popular companies to choose from, including why they might be chosen.
+    5. Use the EXACT format shown above (DAY_START, ACTIVITY_START, etc.).
+    6. Include 3-6 activities per day.
+    7. If you need to drive more than 3 hours between activities, suggest a 15-30 minute break/activity/sightseeing.
+    8. For intermediate stops, use the EXACT dates provided - do not modify them. Include appropriate activities for the specified duration at each stop.
+    9. Always include a price level for each activity:
+        - free: No cost (parks, walking tours, public spaces)
+        - $: Low cost (basic museums, casual dining)
+        - $$: Moderate cost (guided tours, mid-range restaurants)
+        - $$$: High cost (luxury experiences, fine dining)
+    10. For EACH activity, include a required "Why" section that explains:
+        - How it matches the user's preferences
+        - What makes it special or unique
+        - Why it's recommended at this specific time/location
+        - How it fits with the overall itinerary
+
+    Remember to follow all formatting rules above and incorporate the breakdown by date/city.
+    """
+
+    async def _process_response(self, response: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the response from the AI model"""
+        try:
+            # Validate response format and language
+            if not self._validate_response(response, args):
+                raise ValueError("Invalid response format")
+
+            # Parse the response into days and activities
+            days = []
+            raw_days = response.split('[DAY_START]')[1:]  # Skip empty first split
+
+            for day in raw_days:
+                day_dict = {}
+                
+                # Extract date
+                date_match = re.search(r'Date: (\d{4}-\d{2}-\d{2})', day)
+                if not date_match:
+                    # Allow processing to continue if a day block is malformed, but log it
+                    logger.warning("Skipping day block due to missing or invalid date format.")
+                    continue 
+                day_dict['date'] = date_match.group(1)
+                
+                # Parse activities
+                activities = []
+                # Find activities using regex to handle potential missing [ACTIVITY_END]
+                activity_blocks = re.findall(r'(\[ACTIVITY_START\].*?(?=\n\s*\[ACTIVITY_START\]|\n\s*\[DAY_END\]|$))', day, re.DOTALL)
+                
+                if not activity_blocks:
+                     logger.warning(f"No activities found for date {day_dict['date']}. Skipping day.")
+                     continue # Skip days with no activities
+                     
+                for activity_text_match in activity_blocks:
+                    # Handle potential tuple return from findall if capture groups were used unintentionally
+                    activity_text = activity_text_match if isinstance(activity_text_match, str) else activity_text_match[0]
+                    activity_dict = {}
+                    
+                    # Extract time more robustly
+                    time_match = re.search(r'Time:\s*(.+?)\n', activity_text)
+                    activity_dict['time'] = time_match.group(1).strip() if time_match else "Time not specified"
+                    
+                    # Extract type robustly
+                    type_match = re.search(r'Type:\s*(travel|food|activity|sightseeing|accommodation|lunch)\s*\n', activity_text, re.IGNORECASE)
+                    activity_dict['type'] = 'food' if type_match and type_match.group(1).lower() == 'lunch' else (type_match.group(1) if type_match else 'activity')
+                    
+                    # Extract price robustly
+                    price_match = re.search(r'Price:\s*(free|\$|\$\$|\$\$\$)\s*\n', activity_text, re.IGNORECASE)
+                    activity_dict['price'] = price_match.group(1) if price_match else '$$' # Default price
+                    
+                    # Extract location robustly
+                    location_match = re.search(r'Location:\s*(.*?)(?=\n\s*(?:Coordinates:|Why:|Price:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', activity_text, re.DOTALL | re.IGNORECASE)
+                    activity_dict['location'] = location_match.group(1).strip() if location_match else "Location not specified"
+                    
+                    # Extract coordinates robustly
+                    coords_text = None
+                    coords_match = re.search(r'Coordinates:\s*(.*?)(?=\n\s*(?:Why:|Price:|Location:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', activity_text, re.DOTALL | re.IGNORECASE)
+                    if coords_match:
+                        coords_text = coords_match.group(1).strip()
+                        if coords_text.lower() not in ['n/a', 'not available', '']:
+                            patterns = [
+                                r'([+-]?\d+\.?\d*)\s*[°]?\s*[NSns]?,?\s*([+-]?\d+\.?\d*)\s*[°]?\s*[EWew]?', 
+                                r'([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)', 
+                                r'([+-]?\d+\.?\d*)[^\d.,-]+([+-]?\d+\.?\d*)'
+                            ]
+                            valid_coords = False
+                            for pattern in patterns:
+                                coords = re.search(pattern, coords_text, re.IGNORECASE)
+                                if coords:
+                                    try:
+                                        lat = float(coords.group(1))
+                                        lon = float(coords.group(2))
+                                        if -90 <= lat <= 90 and -180 <= lon <= 180:
+                                            valid_coords = True
+                                            activity_dict['coordinates'] = {'latitude': lat, 'longitude': lon}
+                                            break
+                                    except (ValueError, IndexError, TypeError):
+                                        continue
+                            if not valid_coords:
+                                logger.warning(f"Invalid or unparseable coordinates format: '{coords_text}' for activity on {day_dict['date']}")
+                        # else: logger.info(f"Coordinates marked as not available for activity on {day_dict['date']}")
+                    
+                    # Extract description robustly
+                    desc_match = re.search(r'Description:\s*(.*?)(?=\n\s*(?:Why:|Price:|Location:|Coordinates:|Type:|Time:|\[ACTIVITY_END\]|$))', activity_text, re.DOTALL | re.IGNORECASE)
+                    activity_dict['description'] = desc_match.group(1).strip() if desc_match else "No description provided."
+                    
+                    # Extract why robustly
+                    why_match = re.search(r'Why:\s*(.*?)(?=\n\s*(?:Price:|Location:|Coordinates:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', activity_text, re.DOTALL | re.IGNORECASE)
+                    activity_dict['why'] = why_match.group(1).strip() if why_match else "Recommended based on travel preferences."
+                    
+                    activity_dict['id'] = f"{day_dict['date']}-{uuid.uuid4()}" # Ensure unique ID
+                    
+                    activities.append(activity_dict)
+                
+                if activities: # Only add day if it has activities
+                     day_dict['activities'] = activities
+                     days.append(day_dict)
+                # No else needed, already logged warning if no activities found
+
+            return {
+                'days': days,
+                'language': args.get('language', 'en')
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing response: {str(e)}")
+            return self._create_fallback_itinerary(args)
+
+    def _validate_response(self, response: str, args: Dict[str, Any]) -> bool:
+        """Validate the response format and content"""
+        try:
+            # Check for required format tags
+            if not all(tag in response for tag in ['[DAY_START]', '[DAY_END]', '[ACTIVITY_START]', '[ACTIVITY_END]']):
+                # Log error but allow processing if basic structure seems present
+                if '[DAY_START]' not in response or 'Date:' not in response:
+                     logger.error("Missing required format tags [DAY_START] or Date: in response")
+                     return False
+                else:
+                     logger.warning("Response missing some format tags ([DAY_END], [ACTIVITY_START/END]), attempting parse.")
+
+            # Basic Language validation (optional)
+            try:
+                target_language = args.get('language', 'en')
+                # Find description text more reliably
+                desc_samples = re.findall(r'Description:\s*(.*?)(?=\n\s*(?:Why:|$))', response, re.DOTALL | re.IGNORECASE)
+                sample_text = ' '.join(desc_samples)[:500] # Limit sample size
+                if sample_text:
+                    detected_lang = detect(sample_text)
+                    lang_map = {'en': ['en'], 'es': ['es'], 'fr': ['fr'], 'de': ['de'], 'it': ['it'], 'ru': ['ru'], 'zh': ['zh-cn', 'zh-tw']}
+                    if target_language in lang_map and detected_lang not in lang_map[target_language]:
+                        logger.warning(f"Potential language mismatch. Expected {target_language}, detected {detected_lang} in sample.")
+                # else: logger.info("No description text found for language validation.")
+            except Exception as lang_e:
+                logger.warning(f"Language detection failed during validation: {str(lang_e)}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Validation error: {str(e)}")
+            return False
+            
+    def _create_fallback_itinerary(self, trip_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a fallback itinerary when the AI response cannot be parsed"""
+        logger.warning(f"Creating fallback itinerary for request: {trip_data.get('destination')}") # Log warning
+        try:
+            start_date_str = trip_data.get('startDate', datetime.now().strftime('%Y-%m-%d'))
+            end_date_str = trip_data.get('endDate', (datetime.now() + timedelta(days=2)).strftime('%Y-%m-%d'))
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            days_count = (end_date - start_date).days + 1
+            
+            if days_count <= 0:
+                 logger.error(f"Invalid date range for fallback: {start_date_str} to {end_date_str}")
+                 days_count = 1 # Ensure at least one day
+                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                 end_date = start_date
+
+            itinerary = {"days": [], "language": trip_data.get('language', 'en')}
+            destination = trip_data.get('destination', 'Unknown Destination')
+            
+            for i in range(days_count):
+                current_date = start_date + timedelta(days=i)
+                activities = [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "time": "10:00 AM - 12:00 PM",
+                        "type": "activity",
+                        "description": f"Fallback: Explore {destination}",
+                        "location": destination,
+                        "price": "$$",
+                        "why": "Default fallback activity."
+                    },
+                    {
+                        "id": str(uuid.uuid4()),
+                        "time": "12:30 PM - 2:00 PM",
+                        "type": "food",
+                        "description": "Fallback: Lunch break",
+                        "location": "Local Restaurant",
+                        "price": "$$",
+                        "why": "Time for lunch."
+                    },
+                    {
+                        "id": str(uuid.uuid4()),
+                        "time": "2:30 PM - 5:30 PM",
+                        "type": "sightseeing",
+                        "description": "Fallback: Visit local attractions",
+                        "location": destination,
+                        "price": "$$",
+                        "why": "Default fallback sightseeing."
+                    }
+                ]
+                
+                itinerary["days"].append({
+                    "date": current_date.strftime('%Y-%m-%d'),
+                    "activities": activities
+                })
+            
+            logger.info(f"Fallback itinerary created with {len(itinerary['days'])} days.")
+            return itinerary
+        except Exception as e:
+             logger.exception(f"Error creating fallback itinerary: {str(e)}")
+             # Ultimate fallback: return minimal structure
+             return {"days": [], "language": trip_data.get('language', 'en'), "error": "Failed to create fallback itinerary"}
+
+
+# Define what should be exported from this module
+__all__ = [
+    'AIClient',
+    'generate_itinerary',
+    'generate_cache_key',
+    'clear_cache_for_request',
+    'is_cached'
+]

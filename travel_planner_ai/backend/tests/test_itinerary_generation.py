@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 from typing import Dict
-from travel_planner_ai.backend.ai.base_client import BaseAIClient
+from travel_planner_ai.backend.ai_client import AIClient
+from travel_planner_ai.backend.config.ai_config import AI_CONFIG, get_model_config
 
 def get_model_config(model_name: str = None) -> Dict:
     """
@@ -12,10 +13,10 @@ def get_model_config(model_name: str = None) -> Dict:
 
 def test_real_itinerary_generation():
     """
-    Test function that attempts to generate an itinerary using the BaseAIClient.
+    Test function that attempts to generate an itinerary using the AIClient.
     """
     load_dotenv()
-    client = BaseAIClient(api_key=os.getenv("OPENAI_API_KEY"))
+    client = AIClient(api_key=os.getenv("OPENAI_API_KEY"))
     
     test_prompt = {
         "origin": "Florida",
@@ -45,10 +46,16 @@ def test_real_itinerary_generation():
 def print_itinerary_result(result: dict):
     """Helper function to nicely print the itinerary result."""
     print("\n=== Generated Itinerary ===")
-    print(f"Success: {result['success']}")
-    print(f"Generated at: {result['generated_at']}")
-    print("\nContent:")
-    print(result['content'])
+    if isinstance(result, dict) and 'days' in result:
+        print(f"Number of days: {len(result['days'])}")
+        print(f"Language: {result.get('language', 'en')}")
+        print("\nSample activities:")
+        for i, day in enumerate(result['days'][:2], 1):  # Print first two days
+            print(f"Day {i} ({day['date']}):")
+            for j, activity in enumerate(day['activities'][:2], 1):  # Print first two activities
+                print(f"  {j}. {activity['time']} - {activity['type']} - {activity['location']}")
+    else:
+        print("Unexpected result format:", result)
 
 if __name__ == "__main__":
     test_real_itinerary_generation()
