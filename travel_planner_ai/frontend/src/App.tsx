@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Button } from 'react-bootstrap';
+import { Container, Row, Col, Button, Dropdown } from 'react-bootstrap';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import TripForm from './components/TripForm';
 import Itinerary from './components/Itinerary';
-import TripExport from './components/TripExport';
 import TripTitleExport from './components/TripTitleExport';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare } from 'react-icons/fa';
+import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 import { saveTrip, updateTrip } from './services/tripService';
@@ -21,6 +20,7 @@ import { notifyError, notifySuccess } from './services/errorService';
 import { generateItinerary } from './services/itineraryService';
 import './styles/App.css';
 import FaqPage from './pages/FaqPage/FaqPage';
+import ical from 'ical-generator';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
@@ -819,35 +819,193 @@ const MainApp = () => {
                           )}
                         </Button>
                         {currentTripId && itinerary && formData && (
-                          <div className="dropdown">
-                            <Button
+                          <Dropdown>
+                            <Dropdown.Toggle
                               variant="outline-primary"
-                              className="dropdown-toggle d-flex align-items-center gap-2"
-                              data-bs-toggle="dropdown"
-                              aria-expanded="false"
+                              id="share-dropdown-button"
+                              className="d-flex align-items-center gap-2"
                             >
                               <FaShare className="me-1" />
                               Share
-                            </Button>
-                            <ul className="dropdown-menu">
-                              <li>
-                                <Button
-                                  variant="link"
-                                  className="dropdown-item"
-                                  onClick={() => {
-                                    const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
-                                    navigator.clipboard.writeText(shareUrl);
-                                    notifySuccess('Share URL copied to clipboard!');
-                                  }}
-                                >
-                                  Copy Link
-                                </Button>
-                              </li>
-                              <li>
-                                <TripExport itinerary={itinerary} formData={formData} />
-                              </li>
-                            </ul>
-                          </div>
+                            </Dropdown.Toggle>
+                            <Dropdown.Menu>
+                              <Dropdown.Item
+                                onClick={() => {
+                                  const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
+                                  navigator.clipboard.writeText(shareUrl);
+                                  notifySuccess('Share URL copied to clipboard!');
+                                }}
+                              >
+                                <FaCopy className="me-2" />
+                                Copy Link
+                              </Dropdown.Item>
+                              <Dropdown.Divider />
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={() => { 
+                                  const shareUrl = encodeURIComponent(window.location.href);
+                                  const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
+                                  const whatsappUrl = `https://wa.me/?text=${shareTitle}%20${shareUrl}`;
+                                  window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+                                  notifySuccess('WhatsApp share window opened!');
+                                }}
+                              >
+                                <FaWhatsapp className="me-2 text-success" />
+                                Share via WhatsApp
+                              </Dropdown.Item>
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={() => { 
+                                  const shareUrl = encodeURIComponent(window.location.href);
+                                  const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
+                                  const telegramUrl = `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`;
+                                  window.open(telegramUrl, '_blank', 'noopener,noreferrer');
+                                  notifySuccess('Telegram share window opened!');
+                                }}
+                              >
+                                <FaTelegram className="me-2 text-primary" />
+                                Share via Telegram
+                              </Dropdown.Item>
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={() => { 
+                                  // For Facebook, we only need the URL
+                                  const shareUrl = encodeURIComponent(window.location.href);
+                                  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
+                                  window.open(facebookUrl, '_blank', 'noopener,noreferrer');
+                                  notifySuccess('Facebook share window opened!');
+                                }}
+                              >
+                                <FaFacebook className="me-2 text-primary" />
+                                Share via Facebook
+                              </Dropdown.Item>
+                              <Dropdown.Divider />
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={() => { 
+                                  // Generate trip description
+                                  let description = `Trip to ${formData.destination}\n`;
+                                  description += `${formData.startDate} - ${formData.endDate}\n\n`;
+                                  
+                                  itinerary.days.forEach((day, index) => {
+                                    description += `Day ${index + 1} - ${day.date}:\n`;
+                                    day.activities.forEach(activity => {
+                                      description += `  ${activity.time} - ${activity.description}\n`;
+                                    });
+                                    description += '\n';
+                                  });
+                                  
+                                  // Create and download text file
+                                  const blob = new Blob([description], { type: 'text/plain' });
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `trip-to-${formData.destination}.txt`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                  notifySuccess('Text file exported successfully!');
+                                }}
+                              >
+                                <FaFileAlt className="me-2" />
+                                Export as Text
+                              </Dropdown.Item>
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={() => { 
+                                  // Create and download JSON file
+                                  const data = {
+                                    formData,
+                                    itinerary
+                                  };
+                                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `trip-to-${formData.destination}.json`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                  notifySuccess('JSON file exported successfully!');
+                                }}
+                              >
+                                <FaFileDownload className="me-2" />
+                                Export as JSON
+                              </Dropdown.Item>
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={() => { 
+                                  // Generate trip description for calendar
+                                  let description = `Trip to ${formData.destination}\n\n`;
+                                  
+                                  itinerary.days.forEach((day, index) => {
+                                    description += `Day ${index + 1} - ${day.date}:\n`;
+                                    day.activities.forEach(activity => {
+                                      description += `  ${activity.time} - ${activity.description}\n`;
+                                    });
+                                    description += '\n';
+                                  });
+                                  
+                                  // Create calendar file
+                                  const calendar = ical();
+                                  const startDate = new Date(formData.startDate);
+                                  const endDate = new Date(formData.endDate);
+                                  
+                                  calendar.createEvent({
+                                    start: startDate,
+                                    end: endDate,
+                                    summary: `Trip to ${formData.destination}`,
+                                    description: description,
+                                    location: formData.destination
+                                  });
+                                  
+                                  // Download calendar file
+                                  const blob = new Blob([calendar.toString()], { type: 'text/calendar' });
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', `trip-to-${formData.destination}.ics`);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                  notifySuccess('Calendar file exported successfully!');
+                                }}
+                              >
+                                <FaCalendarAlt className="me-2" />
+                                Add to Calendar (ICS)
+                              </Dropdown.Item>
+                              <Dropdown.Item 
+                                as="button" 
+                                onClick={async () => { 
+                                  try {
+                                    // Generate trip description
+                                    let description = `Trip to ${formData.destination}\n`;
+                                    description += `${formData.startDate} - ${formData.endDate}\n\n`;
+                                    
+                                    itinerary.days.forEach((day, index) => {
+                                      description += `Day ${index + 1} - ${day.date}:\n`;
+                                      day.activities.forEach(activity => {
+                                        description += `  ${activity.time} - ${activity.description}\n`;
+                                      });
+                                      description += '\n';
+                                    });
+                                    
+                                    // Copy to clipboard
+                                    await navigator.clipboard.writeText(description);
+                                    notifySuccess('Trip details copied to clipboard!');
+                                  } catch (error) {
+                                    notifyError('Failed to copy trip details to clipboard', user?.email);
+                                  }
+                                }}
+                              >
+                                <FaCopy className="me-2" />
+                                Copy to Clipboard
+                              </Dropdown.Item>
+                            </Dropdown.Menu>
+                          </Dropdown>
                         )}
                       </>
                     ) : (
