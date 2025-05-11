@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useForm, Controller, SubmitHandler } from 'react-hook-form';
-import { Form, Button, Row, Col, Spinner, Alert, OverlayTrigger, Tooltip, Accordion, Badge } from 'react-bootstrap';
-import { FaPlaneDeparture, FaPlaneArrival, FaCalendarAlt, FaUsers, FaUtensils, FaHotel, FaLandmark, FaTheaterMasks, FaInfoCircle, FaPlus } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { Form, Button, Row, Col, OverlayTrigger, Tooltip, Accordion, Badge } from 'react-bootstrap';
+import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType } from '../types';
 
 interface TripFormProps {
   onSubmit: (data: TripFormData) => void;
   isLoading: boolean;
+  user?: any; // Add user prop to check if user is signed in
 }
 
-const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
+const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
   const [formData, setFormData] = useState<TripFormData>({
     travelType: 'flight',
     origin: '',
@@ -454,6 +454,34 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
                 <option value="thai">Thai</option>
               </Form.Select>
             </Form.Group>
+
+            {/* Language */}
+            <Form.Group className="mb-3">
+              <Form.Label className="d-flex align-items-center">
+                Language
+                <OverlayTrigger
+                  placement="top"
+                  overlay={<Tooltip id="language-tooltip">Select the language for your itinerary</Tooltip>}
+                >
+                  <span className="ms-2">
+                    <FaInfoCircle className="text-secondary" size={14} />
+                  </span>
+                </OverlayTrigger>
+              </Form.Label>
+              <Form.Select
+                className="shadow-sm"
+                value={formData.language}
+                onChange={(e) => setFormData({...formData, language: e.target.value})}
+              >
+                <option value="en">English</option>
+                <option value="es">Spanish (Español)</option>
+                <option value="fr">French (Français)</option>
+                <option value="de">German (Deutsch)</option>
+                <option value="it">Italian (Italiano)</option>
+                <option value="ru">Russian (Русский)</option>
+                <option value="zh">Chinese (中文)</option>
+              </Form.Select>
+            </Form.Group>
           </Accordion.Body>
         </Accordion.Item>
       </Accordion>
@@ -486,24 +514,6 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
         </div>
       </Form.Group>
 
-      {/* Language */}
-      <Form.Group className="mb-4">
-        <Form.Label>Language</Form.Label>
-        <Form.Select
-          className="shadow-sm"
-          value={formData.language}
-          onChange={(e) => setFormData({...formData, language: e.target.value})}
-        >
-          <option value="en">English</option>
-          <option value="es">Spanish (Español)</option>
-          <option value="fr">French (Français)</option>
-          <option value="de">German (Deutsch)</option>
-          <option value="it">Italian (Italiano)</option>
-          <option value="ru">Russian (Русский)</option>
-          <option value="zh">Chinese (中文)</option>
-        </Form.Select>
-      </Form.Group>
-
       <Button 
         type="submit" 
         disabled={isLoading} 
@@ -518,6 +528,15 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading }) => {
           'Plan My Trip'
         )}
       </Button>
+      
+      {/* Sign in prompt - only shown if user is not signed in */}
+      {!user && (
+        <div className="mt-2 text-center text-secondary">
+          <small>
+            💾 Sign in to save your plan and access it later.
+          </small>
+        </div>
+      )}
     </Form>
   );
 };

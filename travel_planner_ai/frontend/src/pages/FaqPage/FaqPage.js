@@ -147,7 +147,7 @@ const FaqPage = () => {
         <FaqItem question="How do I create a trip plan?">
           <p>Creating a trip plan is easy!</p>
           <ol>
-            <li>Navigate to the 'New Trip' page.</li>
+            <li>Navigate to the main page: travelplannerai.org</li>
             <li>Enter your destination, travel dates, and interests.</li>
             <li>Our AI will generate a personalized itinerary for you.</li>
             <li>You can review and customize the plan further.</li>
@@ -158,7 +158,7 @@ const FaqPage = () => {
         <FaqItem question="How do I buy credits?">
           <p>You can purchase credits through our secure payment portal.</p>
           <ol>
-            <li>Go to your 'Account' or 'Billing' section (link usually in the header or sidebar).</li>
+            <li>Go to your credits section (image with number of credits next to 'My Trips').</li>
             <li>Select the credit package you wish to purchase.</li>
             <li>Follow the on-screen instructions to complete the payment via Stripe.</li>
           </ol>

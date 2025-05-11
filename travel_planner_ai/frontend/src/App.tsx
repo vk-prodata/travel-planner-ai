@@ -31,7 +31,7 @@ const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
     .join(''); // Join them together
 
   return (
-    <div 
+    <div
       className="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary"
       style={{ 
         width: '32px', 
@@ -44,18 +44,6 @@ const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
     </div>
   );
 };
-
-const SignInPrompt: React.FC = () => (
-  <div className="alert alert-warning d-flex align-items-center mt-3" role="alert">
-    <div className="d-flex align-items-center">
-      <i className="fas fa-exclamation-triangle me-2"></i>
-      <div>
-        Please <strong>sign in</strong> to save your trips and access them later.
-      </div>
-    </div>
-    <AuthForm />
-  </div>
-);
 
 const ReadOnlyBanner: React.FC = () => (
   <div className="alert alert-info mb-4 d-flex justify-content-between align-items-center">
@@ -719,7 +707,18 @@ const MainApp = () => {
                 <div className="d-flex align-items-center">
                   <LoggingToggle />
                   {!user ? (
-                    <AuthForm />
+                    !isReadOnlyMode && (
+                      <div className="d-flex align-items-center">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => navigate('/faq')}
+                          className="rounded-pill me-2"
+                        >
+                          FAQ
+                        </Button>
+                      </div>
+                    )
                   ) : (
                     <div className="d-flex flex-wrap align-items-center gap-2">
                       <CreditsDisplay />
@@ -757,8 +756,7 @@ const MainApp = () => {
                   <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
                 </div>
               </div>
-              <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
-              {!user && !isReadOnlyMode && <SignInPrompt />}
+              <TripForm onSubmit={handleSubmit} isLoading={isLoading} user={user} />
             </div>
           </div>
         </Col>
