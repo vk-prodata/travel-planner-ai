@@ -45,14 +45,20 @@ const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-const ReadOnlyBanner: React.FC = () => (
-  <div className="alert alert-info mb-4 d-flex justify-content-between align-items-center">
-    <div>
-      <strong>Read-only mode</strong> - You're viewing a shared trip.
+const ReadOnlyBanner: React.FC<{ isReadOnlyMode?: boolean }> = ({ isReadOnlyMode = true }) => {
+  return (
+    <div className="alert alert-info mb-4 d-flex justify-content-between align-items-center">
+      <div>
+        {isReadOnlyMode ? (
+          <span><strong>Read-only mode</strong> - You're viewing a shared trip.</span>
+        ) : (
+          <span><strong>Sign in</strong> to save your trips and access them later.</span>
+        )}
+      </div>
+      <AuthForm />
     </div>
-    <AuthForm />
-  </div>
-);
+  );
+};
 
 const MainApp = () => {
   const { user, signOut, refreshUserCredits } = useAuth();
@@ -772,8 +778,8 @@ const MainApp = () => {
               </div>
             ) : itinerary ? (
               <div>
-                {isReadOnlyMode && (
-                  <ReadOnlyBanner />
+                {(isReadOnlyMode || !user) && (
+                  <ReadOnlyBanner isReadOnlyMode={isReadOnlyMode} />
                 )}
                 <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
                   {isEditingTitle ? (
@@ -1059,7 +1065,10 @@ const MainApp = () => {
                 />
               </div>
             ) : (
-              <div className="text-center py-5">
+              <div className="text-center py-1">
+                {!user && (
+                  <ReadOnlyBanner isReadOnlyMode={false} />
+                )}
                 <div className="bg-white p-5 rounded shadow-sm">
                   <h3 className="text-primary-dark mb-3">Plan Your Dream Trip</h3>
                   <p className="text-secondary mb-4">Fill out the form to get your personalized travel itinerary</p>
