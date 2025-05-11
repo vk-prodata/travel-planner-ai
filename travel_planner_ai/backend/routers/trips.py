@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from ..database import get_db, get_user_collection
 from ..auth import get_current_user
 from ..models import TripCreate, TripUpdate
@@ -6,10 +7,11 @@ from bson import ObjectId
 import logging
 import datetime
 from ..services.credits_service import deduct_credits, deduct_credits_for_trip
+from typing import Optional
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
+security = HTTPBearer(auto_error=False)
 
 def normalize_trip_data(trip):
     """Ensure trip data has consistent structure for frontend compatibility."""
@@ -92,14 +94,33 @@ async def get_user_trips(
         logger.error(f"Error fetching trips: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+async def get_current_user_if_available(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    users_collection = Depends(get_user_collection)
+) -> Optional[dict]:
+    """
+    Get the current user if a valid token is provided, otherwise return None.
+    This allows endpoints to be accessed without authentication but still get
+    the user information if it's available.
+    """
+    if credentials is None:
+        return None
+        
+    try:
+        return await get_current_user(credentials, users_collection)
+    except HTTPException:
+        return None
+
 @router.get("/trips/{trip_id}")
 async def get_trip(
     trip_id: str,
-    current_user = Depends(get_current_user),
-    db = Depends(get_db)
+    db = Depends(get_db),
+    current_user: Optional[dict] = Depends(get_current_user_if_available)
 ):
+    """Get a trip by ID. This endpoint can be accessed without authentication."""
     try:
-        logger.info(f"Fetching trip {trip_id} for user: {current_user['email']}")
+        # Log with the user email if authenticated, otherwise anonymous
+        logger.info(f"Fetching trip {trip_id} for user: {current_user['email'] if current_user else 'anonymous'}")
         
         # First try direct UUID match without user_id constraint
         trip = db.trips_collection.find_one({
@@ -125,7 +146,7 @@ async def get_trip(
         
         # Add a flag to indicate if the current user is the owner
         normalized_trip = normalize_trip_data(trip)
-        normalized_trip["isOwner"] = trip.get("user_id") == current_user["id"]
+        normalized_trip["isOwner"] = current_user is not None and trip.get("user_id") == current_user.get("id")
         
         # Ensure itinerary is properly included
         if not normalized_trip.get("itinerary"):

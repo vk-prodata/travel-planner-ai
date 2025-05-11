@@ -144,4 +144,69 @@ export const getUserTrips = async (userId: string): Promise<SavedTrip[]> => {
     notifyError(errorMsg, userId);
     throw error;
   }
+};
+
+export const getTripById = async (tripId: string): Promise<SavedTrip> => {
+  try {
+    console.log("getTripById called for tripId:", tripId);
+    // Get token if available
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add auth header if token exists
+    if (token) {
+      console.log("Auth token found, adding to headers");
+      headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      console.log("No auth token found, proceeding as anonymous");
+    }
+    
+    const apiUrl = `${API_URL}/trips/${tripId}`;
+    console.log("Fetching from URL:", apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+
+    console.log("API Response status:", response.status);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => {
+        return response.text().then(text => ({ detail: text || "Unknown error" }));
+      });
+      
+      console.error('Error loading trip - Response details:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData
+      });
+      
+      const errorMessage = errorData?.detail || `Failed to load trip: ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    const trip = await response.json();
+    console.log("Trip data received:", {
+      id: trip.id,
+      hasFormData: !!trip.formData,
+      hasItinerary: !!trip.itinerary,
+      isOwner: trip.isOwner,
+      daysCount: trip.itinerary?.days?.length || 0
+    });
+    
+    return trip as SavedTrip;
+  } catch (error) {
+    console.error('Error fetching trip by ID:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Failed to load trip';
+    // Only show error notification if user is logged in
+    const userEmail = localStorage.getItem('userEmail');
+    if (userEmail) {
+      notifyError(errorMsg, userEmail);
+    }
+    throw error;
+  }
 }; 

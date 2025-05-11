@@ -9,7 +9,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
-import { saveTrip, updateTrip } from './services/tripService';
+import { saveTrip, updateTrip, getTripById } from './services/tripService';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import TripList from './pages/TripList';
@@ -57,6 +57,15 @@ const SignInPrompt: React.FC = () => (
   </div>
 );
 
+const ReadOnlyBanner: React.FC = () => (
+  <div className="alert alert-info mb-4 d-flex justify-content-between align-items-center">
+    <div>
+      <strong>Read-only mode</strong> - You're viewing a shared trip.
+    </div>
+    <AuthForm />
+  </div>
+);
+
 const MainApp = () => {
   const { user, signOut, refreshUserCredits } = useAuth();
   const navigate = useNavigate();
@@ -72,6 +81,7 @@ const MainApp = () => {
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localItinerary, setLocalItinerary] = useState<TripItinerary | null>(null);
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
 
   // Use location in a comment to avoid the unused variable warning
   // Current path: ${location.pathname}
@@ -79,41 +89,34 @@ const MainApp = () => {
   // Load trip if tripId is in URL
   useEffect(() => {
     const tripId = searchParams.get('tripId');
-    if (tripId && user) {
+    if (tripId) {
       const loadTrip = async () => {
+        console.log("Starting to load trip with ID:", tripId);
+        console.log("User authentication status:", user ? "Authenticated" : "Not authenticated");
+        
         setIsLoading(true);
         try {
           console.log(`Loading trip with ID: ${tripId}`);
           
-          // Direct API call to get a specific trip instead of filtering from all trips
-          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/trips/${tripId}`, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
-            credentials: 'include',
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Failed to load trip: ${response.status} ${response.statusText}`, errorText);
-            throw new Error(`Failed to load trip: ${response.statusText}`);
-          }
-          
-          const trip = await response.json();
-          console.log('Trip loaded:', trip);
+          // Use the new getTripById function that works for both authenticated and unauthenticated users
+          const trip = await getTripById(tripId);
+          console.log('Trip loaded successfully:', trip);
           
           if (trip) {
             if (!trip.formData) {
               console.error('Trip is missing formData:', trip);
-              notifyError('Trip data is incomplete', user?.email);
+              if (user) {
+                notifyError('Trip data is incomplete', user?.email);
+              }
               setIsLoading(false);
               return;
             }
             
             if (!trip.itinerary || !trip.itinerary.days) {
               console.error('Trip is missing itinerary or days:', trip);
-              notifyError('Trip itinerary is incomplete', user?.email);
+              if (user) {
+                notifyError('Trip itinerary is incomplete', user?.email);
+              }
               setIsLoading(false);
               return;
             }
@@ -121,13 +124,13 @@ const MainApp = () => {
             // Ensure isOwner flag is set in the itinerary
             const itineraryWithOwnership = {
               ...trip.itinerary,
-              isOwner: trip.isOwner ?? trip.user_id === user.id
+              isOwner: trip.isOwner ?? (user && trip.user_id === user.id) ?? false
             };
             
             console.log('Setting itinerary with ownership:', {
               isOwner: itineraryWithOwnership.isOwner,
               userId: trip.user_id,
-              currentUserId: user.id
+              currentUserId: user?.id || 'not logged in'
             });
             
             setFormData(trip.formData);
@@ -135,14 +138,24 @@ const MainApp = () => {
             setLocalItinerary(itineraryWithOwnership);
             setCurrentTripId(trip.id);
             setHasUnsavedChanges(false);
-            notifySuccess('Trip loaded successfully!');
+            
+            if (user) {
+              notifySuccess('Trip loaded successfully!');
+            }
+            
+            // Set read-only mode for unauthenticated users or if user is not the owner
+            setIsReadOnlyMode(!user || !trip.isOwner);
           } else {
             console.error('Trip not found in response');
-            notifyError('Trip not found', user?.email);
+            if (user) {
+              notifyError('Trip not found', user?.email);
+            }
           }
         } catch (error) {
           console.error('Error loading trip:', error);
-          notifyError(error instanceof Error ? error.message : 'Failed to load trip', user?.email);
+          if (user) {
+            notifyError(error instanceof Error ? error.message : 'Failed to load trip', user?.email);
+          }
         } finally {
           setIsLoading(false);
         }
@@ -365,6 +378,10 @@ const MainApp = () => {
   };
 
   const handleSaveTrip = async () => {
+    if (isReadOnlyMode) {
+      return;
+    }
+
     if (!user || !localItinerary || !formData) {
       console.error('Cannot save trip: Missing required data', {
         hasUser: !!user,
@@ -652,6 +669,10 @@ const MainApp = () => {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleGenerateItinerary = async () => {
+    if (isReadOnlyMode) {
+      return;
+    }
+
     try {
       if (!formData) {
         return;
@@ -737,7 +758,7 @@ const MainApp = () => {
                 </div>
               </div>
               <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
-              {!user && <SignInPrompt />}
+              {!user && !isReadOnlyMode && <SignInPrompt />}
             </div>
           </div>
         </Col>
@@ -753,6 +774,9 @@ const MainApp = () => {
               </div>
             ) : itinerary ? (
               <div>
+                {isReadOnlyMode && (
+                  <ReadOnlyBanner />
+                )}
                 <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
                   {isEditingTitle ? (
                     <div className="d-flex align-items-center gap-2">
@@ -802,7 +826,7 @@ const MainApp = () => {
                         <Button
                           variant="primary"
                           onClick={handleSaveTrip}
-                          disabled={isSaving || !hasUnsavedChanges}
+                          disabled={isSaving || !hasUnsavedChanges || isReadOnlyMode}
                           className="d-flex align-items-center gap-2"
                           style={{ minWidth: '140px' }}
                         >
@@ -1032,7 +1056,8 @@ const MainApp = () => {
                   onActivityDelete={handleActivityDelete}
                   onActivityRefresh={refreshActivity}
                   isLoading={isLoading}
-                  isOwner={itinerary?.isOwner ?? false}
+                  isOwner={itinerary?.isOwner}
+                  isReadOnly={isReadOnlyMode}
                 />
               </div>
             ) : (

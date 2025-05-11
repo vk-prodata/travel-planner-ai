@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, Button, Alert } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
 import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt } from 'react-icons/bs';
-import { FaMapMarkerAlt, FaUtensils, FaBed, FaLandmark, FaTheaterMasks, FaInfoCircle, FaExpandAlt, FaCompressAlt, FaWalking, FaClock } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import '../styles/Itinerary.css';
 
@@ -13,6 +12,7 @@ interface ItineraryProps {
   onActivityRefresh: (dayIndex: number, activityIndex: number, activity: Activity) => Promise<void>;
   isLoading: boolean;
   isOwner?: boolean;
+  isReadOnly?: boolean;
 }
 
 const Itinerary: React.FC<ItineraryProps> = ({ 
@@ -21,7 +21,8 @@ const Itinerary: React.FC<ItineraryProps> = ({
   onActivityDelete,
   onActivityRefresh,
   isLoading,
-  isOwner = false
+  isOwner = false,
+  isReadOnly = false
 }) => {
   const [altSuggestions, setAltSuggestions] = useState<{[key: string]: string}>({});
   const [refreshingActivities, setRefreshingActivities] = useState<{[key: string]: boolean}>({});
@@ -241,31 +242,29 @@ const Itinerary: React.FC<ItineraryProps> = ({
                           )}
                         </div>
                       </div>
-                      <div className="d-flex gap-2">
-                        {isOwner && (
-                          <>
-                            <Button
-                              variant="outline-primary"
-                              className="refresh-button"
-                              onClick={() => handleRefreshActivity(dayIndex, activityIndex, activity)}
-                              disabled={isRefreshing || isLoading}
-                            >
-                              <BsArrowRepeat 
-                                size={20} 
-                                className={isRefreshing ? 'spin' : ''} 
-                              />
-                            </Button>
-                            <Button
-                              variant="outline-danger"
-                              className="delete-button"
-                              onClick={() => handleDeleteActivity(dayIndex, activityIndex)}
-                              disabled={isLoading}
-                            >
-                              <BsTrash size={16} />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      {!isReadOnly && isOwner && (
+                        <div className="d-flex gap-2">
+                          <Button
+                            variant="outline-primary"
+                            className="refresh-button"
+                            onClick={() => handleRefreshActivity(dayIndex, activityIndex, activity)}
+                            disabled={isRefreshing || isLoading}
+                          >
+                            <BsArrowRepeat 
+                              size={20} 
+                              className={isRefreshing ? 'spin' : ''} 
+                            />
+                          </Button>
+                          <Button
+                            variant="outline-danger"
+                            className="delete-button"
+                            onClick={() => handleDeleteActivity(dayIndex, activityIndex)}
+                            disabled={isLoading}
+                          >
+                            <BsTrash size={16} />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </Card.Body>
                 </Card>

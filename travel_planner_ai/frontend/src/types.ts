@@ -103,4 +103,5 @@ export interface SavedTrip {
   itinerary: TripItinerary;
   created_at?: string;
   updated_at?: string;
+  isOwner?: boolean;
 } 
