@@ -162,7 +162,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
                             <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
                               {activity.type}
                             </span>
-                            {getPriceLevelDisplay(activity.priceLevel)}
+                            {getPriceLevelDisplay(activity.price)}
                           </div>
                         </div>
                         <div className="activity-description">

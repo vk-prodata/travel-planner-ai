@@ -1,8 +1,16 @@
 from typing import Dict
 
 AI_CONFIG = {
-    "default_model": "gpt-3.5-turbo-16k",  # Using a stable model as default
+    "default_model": "gpt-4o-2024-11-20",  # Using a stable model as default
     "models": {
+        "gpt-4o-2024-11-20": {
+            "max_tokens": 12000,
+            "temperature": 0.3,
+            "top_p": 0.9,
+            "frequency_penalty": 0.1,
+            "presence_penalty": 0.0,
+            "stop": ["### END"]
+        },
         "gpt-3.5-turbo": {  # Primary model config
             "max_tokens": 2000,
             "temperature": 0.7,
@@ -16,6 +24,20 @@ AI_CONFIG = {
             "top_p":      0.9,       # nucleus sampling to prune very unlikely tokens
             "frequency_penalty": 0.1,   # discourage repeated phrasing in “description”/“why”
             "presence_penalty": 0.0    # keep encouraging new content where needed
+        },
+        "gpt-3.5-turbo-16k-new": {  # Primary model config
+            "max_tokens": 12000,        # plenty for ~4k tokens of output + buffer
+            "temperature": 0.5,         # more creative, so it fills in real activities
+            "top_p": 1.0,               # sample from full distribution
+            "frequency_penalty": 0.2,   # discourage repeated “fallback” phrasing
+            "presence_penalty": 0.1     # nudge toward introducing new content
+        },
+        "gpt-4-turbo-8k": {
+            "max_tokens": 8000,
+            "temperature": 0.5,
+            "top_p": 1.0,
+            "frequency_penalty": 0.2,
+            "presence_penalty": 0.1
         },
         "gpt-4": {  # Configuration for gpt-4
             "max_tokens": 4096, # Example value, adjust as needed

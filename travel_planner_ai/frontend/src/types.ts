@@ -24,7 +24,7 @@ export interface Activity {
   type: string;
   location?: string;
   coordinates?: string;
-  priceLevel?: PriceLevel;
+  price?: PriceLevel;
   why?: string;
 }
 

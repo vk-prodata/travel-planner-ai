@@ -463,6 +463,12 @@ async def refresh_activity(
                     coordinates = line.replace('Coordinates: ', '').strip()
                     if coordinates and coordinates != '(latitude,longitude if available)':
                         new_activity['coordinates'] = coordinates
+                elif line.startswith('Price: '):
+                    price = line.replace('Price: ', '').strip()
+                    # Only store price
+                    new_activity['price'] = price
+                elif line.startswith('Why: '):
+                    new_activity['why'] = line.replace('Why: ', '').strip()
             
             if not new_activity.get('description'):
                 raise ValueError("No description generated for new activity")

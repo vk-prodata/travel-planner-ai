@@ -650,6 +650,7 @@ class AIClient:
         - What makes it special or unique
         - Why it's recommended at this specific time/location
         - How it fits with the overall itinerary
+    11. If destination is a park or related to a nature or user has chosen "Outdoor" activity, suggest a nature activity: trails, hikes, etc.
 
     Remember to follow all formatting rules above and incorporate the breakdown by date/city.
     """
@@ -700,7 +701,10 @@ class AIClient:
                     
                     # Extract price robustly
                     price_match = re.search(r'Price:\s*(free|\$|\$\$|\$\$\$)\s*\n', activity_text, re.IGNORECASE)
-                    activity_dict['price'] = price_match.group(1) if price_match else '$$' # Default price
+                    price = price_match.group(1) if price_match else '$$'  # Default price
+                    
+                    # Store price 
+                    activity_dict['price'] = price
                     
                     # Extract location robustly
                     location_match = re.search(r'Location:\s*(.*?)(?=\n\s*(?:Coordinates:|Why:|Price:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', activity_text, re.DOTALL | re.IGNORECASE)

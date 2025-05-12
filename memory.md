@@ -88,6 +88,38 @@
 - Added proper error handling and detailed logging for user data operations
 - Preserved existing credits when updating user information
 
+### Trip Configuration Enhancement - [Current Date]
+
+- Implemented storing trip configuration with trip activities
+- Added trip_config field to TripItinerary models in both backend and frontend
+- Modified the activity refresh endpoint to use trip configuration for more consistent suggestions
+- Updated App.tsx to save and use trip configuration in refreshActivity function
+- Improved activity suggestions by using original destination, preferences, and budget level
+- Ensured trip configuration is preserved when saving trips
+- Added integration tests for the refresh activity endpoint with trip configuration
+- Made sure newly generated itineraries include trip configuration
+- Fixed type issues to ensure proper type safety in the implementation
+
+### OpenAI Model Configuration Fix - [Current Date]
+
+- Fixed critical error with the OpenAI model configuration
+- Updated the default model from 'gpt-4-turbo-8k' (which doesn't exist) to 'gpt-4-turbo-preview'
+- Adjusted max_tokens parameter from 8000 to 4096 to comply with model limits
+- Added backward compatibility handling for legacy model name references
+- Improved error handling for model configuration mismatches
+- Enhanced logging for model selection issues
+- Added automatic model name correction to prevent API errors
+- Updated get_model_config function to handle invalid model requests gracefully
+
+### Price Level Display Fix - [Current Date]
+
+- Fixed issue with price level indicators not displaying in the UI
+- Simplified naming convention by standardizing on the 'price' field
+- Updated frontend interfaces to use 'price' instead of 'priceLevel'
+- Modified AI client and endpoints to only use the 'price' field
+- Removed redundant 'priceLevel' field to simplify the codebase
+- Ensured consistent display of price indicators (Free, $, $$, $$$) across the application
+
 ### Next Steps
 - Consider adding sorting options for trips (by date, destination, etc.)
 - Add filtering capabilities 
