@@ -1,9 +1,9 @@
 from typing import Dict
 
 AI_CONFIG = {
-    "default_model": "gpt-4o-2024-11-20",  # Using a stable model as default
+    "default_model": "gpt-4o-2024-11-20", #"gpt-4o-2024-11-20",  # Using a stable model as default
     "models": {
-        "gpt-4o-2024-11-20": {
+        "gpt-4o-2024-11-20vk": {
             "max_tokens": 12000,
             "temperature": 0.3,
             "top_p": 0.9,
@@ -45,6 +45,13 @@ AI_CONFIG = {
             "top_p": 1.0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0
+        },
+        "gpt-4o-2024-11-20": {
+            "temperature": 0.3,    # Low temperature for consistency and correctness in format (reduces hallucinations while keeping some creativity).
+            "top_p": 1.0,          # Use full token distribution; primary randomness control via temperature.
+            "max_tokens": 6000,    # Allow up to ~6000 tokens in the response (covers detailed itineraries up to 10 days).
+            "frequency_penalty": 0.0,  # No repetition penalty (itineraries may naturally repeat structure like days of week).
+            "presence_penalty": 0.0,   # No presence penalty (avoid forcing new/unrelated content; focus on relevant activities).
         }
     }
 }
