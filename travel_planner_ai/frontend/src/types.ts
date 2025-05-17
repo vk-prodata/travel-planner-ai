@@ -49,7 +49,7 @@ export interface Stop {
   days: number;
 }
 
-export type TravelType = 'flight' | 'train' | 'car' | 'bus' | 'cruise';
+export type TravelType = 'flight' | 'train' | 'road' | 'bus' | 'cruise';
 
 export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food' | 'adventure' | 'educational' | 'nightlife' | 'must-see';
 

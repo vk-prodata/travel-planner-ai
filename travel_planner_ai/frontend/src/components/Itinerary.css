@@ -2,13 +2,34 @@
   background: white;
   border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+
+.itinerary .day-header-container {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.itinerary .day-header-container:hover {
+  background-color: #004080 !important;
 }
 
 .itinerary .day-header {
   margin: 0;
-  padding: 1rem;
-  background: #003366;
+  padding: 0;
   color: white;
+  font-size: 1.35rem;
+}
+
+.itinerary .toggle-icon {
+  transition: transform 0.3s ease;
+}
+
+.itinerary .activities-container {
+  transform-origin: top;
+  will-change: max-height, opacity;
 }
 
 .itinerary .activities-list {
@@ -107,4 +128,15 @@
 
 .itinerary .spin {
   animation: spin 1s linear infinite;
+}
+
+/* Responsive styles for mobile devices */
+@media (max-width: 768px) {
+  .itinerary .day-header {
+    font-size: 1.2rem;
+  }
+  
+  .itinerary .activity-time {
+    font-size: 1rem;
+  }
 } 

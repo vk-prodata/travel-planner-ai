@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Alert } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
-import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt } from 'react-icons/bs';
+import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt, BsChevronUp, BsChevronDown } from 'react-icons/bs';
 import { toast } from 'react-toastify';
 import '../styles/Itinerary.css';
 
@@ -26,8 +26,23 @@ const Itinerary: React.FC<ItineraryProps> = ({
 }) => {
   const [altSuggestions, setAltSuggestions] = useState<{[key: string]: string}>({});
   const [refreshingActivities, setRefreshingActivities] = useState<{[key: string]: boolean}>({});
+  const [expandedDays, setExpandedDays] = useState<{[key: string]: boolean}>({});
 
-  const handleRefreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity) => {
+  const toggleDayExpanded = (dayIndex: number) => {
+    setExpandedDays(prev => ({
+      ...prev,
+      [dayIndex]: !(prev[dayIndex] ?? true)
+    }));
+  };
+
+  const isDayExpanded = (dayIndex: number) => {
+    return expandedDays[dayIndex] ?? true;
+  };
+
+  const handleRefreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity, e?: React.MouseEvent) => {
+    // Prevent the click from triggering the collapse
+    e?.stopPropagation();
+    
     try {
       setRefreshingActivities(prev => ({ ...prev, [`${dayIndex}-${activityIndex}`]: true }));
       await onActivityRefresh(dayIndex, activityIndex, activity);
@@ -39,7 +54,10 @@ const Itinerary: React.FC<ItineraryProps> = ({
     }
   };
 
-  const handleDeleteActivity = async (dayIndex: number, activityIndex: number) => {
+  const handleDeleteActivity = async (dayIndex: number, activityIndex: number, e?: React.MouseEvent) => {
+    // Prevent the click from triggering the collapse
+    e?.stopPropagation();
+    
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/activities/${dayIndex}/${activityIndex}`, {
         method: 'DELETE',
@@ -141,138 +159,169 @@ const Itinerary: React.FC<ItineraryProps> = ({
 
   return (
     <div className="itinerary">
-      {itinerary.days.map((day, dayIndex) => (
-        <div key={day.date} className="day-container mb-4">
-          <h2 className="day-header bg-primary text-white p-3 rounded">{day.date}</h2>
-          <div className="activities-list">
-            {day.activities.map((activity, activityIndex) => {
-              const activityKey = `${dayIndex}-${activityIndex}`;
-              const suggestion = altSuggestions[activityKey];
-              const isRefreshing = refreshingActivities[activityKey];
-              const isMeal = activity.type === 'meal' || activity.type === 'food';
+      {itinerary.days.map((day, dayIndex) => {
+        const isExpanded = isDayExpanded(dayIndex);
+        
+        return (
+          <div key={day.date} className="day-container mb-4">
+            <div 
+              className="day-header-container bg-primary text-white rounded"
+              onClick={() => toggleDayExpanded(dayIndex)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="d-flex justify-content-between align-items-center p-3">
+                <h2 className="day-header mb-0">{day.date}</h2>
+                <div className="toggle-icon">
+                  {isExpanded ? <BsChevronUp size={20} /> : <BsChevronDown size={20} />}
+                </div>
+              </div>
+            </div>
+            <div 
+              className="activities-container overflow-hidden"
+              style={{
+                maxHeight: isExpanded ? '3000px' : '0',
+                opacity: isExpanded ? 1 : 0,
+                transition: 'max-height 0.5s ease-in-out, opacity 0.4s ease-in-out'
+              }}
+            >
+              <div className="activities-list">
+                {day.activities.map((activity, activityIndex) => {
+                  const activityKey = `${dayIndex}-${activityIndex}`;
+                  const suggestion = altSuggestions[activityKey];
+                  const isRefreshing = refreshingActivities[activityKey];
+                  const isMeal = activity.type === 'meal' || activity.type === 'food';
 
-              return (
-                <Card key={activity.id} className="mb-2 shadow-sm">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div className="activity-content flex-grow-1">
-                        <div className="d-flex justify-content-between align-items-center">
-                          <div className="activity-time fw-bold">{activity.time}</div>
-                          <div className="d-flex gap-2 align-items-center">
-                            <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
-                              {activity.type}
-                            </span>
-                            {getPriceLevelDisplay(activity.price)}
-                          </div>
-                        </div>
-                        <div className="activity-description">
-                          {isMeal 
-                            ? formatMealDescription(activity.description)
-                            : (
-                                <>
-                                  {activity.description}
-                                  {activity.why && (
-                                    <span className="activity-why">{activity.why}</span>
-                                  )}
-                                </>
-                              )
-                          }
-                          
-                          {activity.location && (
-                            <div className="activity-location mt-2">
-                              <span className="text-muted">
-                                <BsGeoAlt className="me-1" />
-                                {activity.location}
-                              </span>
-                              
-                              {activity.coordinates && (
-                                <a 
-                                  href={getGoogleMapsUrl(activity.coordinates, activity.location)} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="ms-2 text-primary"
-                                >
-                                  View on Map
-                                </a>
-                              )}
-                            </div>
-                          )}
-                          
-                          {suggestion && (
-                            <div className="mt-2 p-2 bg-light rounded">
-                              <div className="text-muted small mb-1">Suggested alternative:</div>
-                              <div className="suggestion-text">{suggestion}</div>
-                              <div className="mt-2 d-flex gap-2">
-                                <Button
-                                  variant="success"
-                                  size="sm"
-                                  className="d-flex align-items-center gap-1"
-                                  onClick={() => {
-                                    onActivityUpdate(dayIndex, activityIndex, {
-                                      ...activity,
-                                      description: suggestion
-                                    });
-                                    setAltSuggestions(prev => {
-                                      const newState = { ...prev };
-                                      delete newState[activityKey];
-                                      return newState;
-                                    });
-                                  }}
-                                >
-                                  <BsCheck size={16} />
-                                  Accept
-                                </Button>
-                                <Button
-                                  variant="outline-secondary"
-                                  size="sm"
-                                  className="d-flex align-items-center gap-1"
-                                  onClick={() => {
-                                    setAltSuggestions(prev => {
-                                      const newState = { ...prev };
-                                      delete newState[activityKey];
-                                      return newState;
-                                    });
-                                  }}
-                                >
-                                  <BsX size={16} />
-                                  Reject
-                                </Button>
+                  return (
+                    <Card 
+                      key={activity.id} 
+                      className="mb-2 shadow-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Card.Body>
+                        <div className="d-flex justify-content-between align-items-start">
+                          <div className="activity-content flex-grow-1">
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div className="activity-time fw-bold">{activity.time}</div>
+                              <div className="d-flex gap-2 align-items-center">
+                                <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
+                                  {activity.type}
+                                </span>
+                                {getPriceLevelDisplay(activity.price)}
                               </div>
                             </div>
+                            <div className="activity-description">
+                              {isMeal 
+                                ? formatMealDescription(activity.description)
+                                : (
+                                    <>
+                                      {activity.description}
+                                      {activity.why && (
+                                        <span className="activity-why">{activity.why}</span>
+                                      )}
+                                    </>
+                                  )
+                              }
+                              
+                              {activity.location && (
+                                <div className="activity-location mt-2">
+                                  <span className="text-muted">
+                                    <BsGeoAlt className="me-1" />
+                                    {activity.location}
+                                  </span>
+                                  
+                                  {activity.coordinates && (
+                                    <a 
+                                      href={getGoogleMapsUrl(activity.coordinates, activity.location)} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="ms-2 text-primary"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      View on Map
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {suggestion && (
+                                <div className="mt-2 p-2 bg-light rounded">
+                                  <div className="text-muted small mb-1">Suggested alternative:</div>
+                                  <div className="suggestion-text">{suggestion}</div>
+                                  <div className="mt-2 d-flex gap-2">
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      className="d-flex align-items-center gap-1"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onActivityUpdate(dayIndex, activityIndex, {
+                                          ...activity,
+                                          description: suggestion
+                                        });
+                                        setAltSuggestions(prev => {
+                                          const newState = { ...prev };
+                                          delete newState[activityKey];
+                                          return newState;
+                                        });
+                                      }}
+                                    >
+                                      <BsCheck size={16} />
+                                      Accept
+                                    </Button>
+                                    <Button
+                                      variant="outline-secondary"
+                                      size="sm"
+                                      className="d-flex align-items-center gap-1"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setAltSuggestions(prev => {
+                                          const newState = { ...prev };
+                                          delete newState[activityKey];
+                                          return newState;
+                                        });
+                                      }}
+                                    >
+                                      <BsX size={16} />
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {!isReadOnly && isOwner && (
+                            <div className="d-flex gap-2">
+                              <Button
+                                variant="outline-primary"
+                                className="refresh-button"
+                                onClick={(e) => handleRefreshActivity(dayIndex, activityIndex, activity, e)}
+                                disabled={isRefreshing || isLoading}
+                              >
+                                <BsArrowRepeat 
+                                  size={20} 
+                                  className={isRefreshing ? 'spin' : ''} 
+                                />
+                              </Button>
+                              <Button
+                                variant="outline-danger"
+                                className="delete-button"
+                                onClick={(e) => handleDeleteActivity(dayIndex, activityIndex, e)}
+                                disabled={isLoading}
+                              >
+                                <BsTrash size={16} />
+                              </Button>
+                            </div>
                           )}
                         </div>
-                      </div>
-                      {!isReadOnly && isOwner && (
-                        <div className="d-flex gap-2">
-                          <Button
-                            variant="outline-primary"
-                            className="refresh-button"
-                            onClick={() => handleRefreshActivity(dayIndex, activityIndex, activity)}
-                            disabled={isRefreshing || isLoading}
-                          >
-                            <BsArrowRepeat 
-                              size={20} 
-                              className={isRefreshing ? 'spin' : ''} 
-                            />
-                          </Button>
-                          <Button
-                            variant="outline-danger"
-                            className="delete-button"
-                            onClick={() => handleDeleteActivity(dayIndex, activityIndex)}
-                            disabled={isLoading}
-                          >
-                            <BsTrash size={16} />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card.Body>
-                </Card>
-              );
-            })}
+                      </Card.Body>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

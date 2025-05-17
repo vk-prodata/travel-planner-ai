@@ -11,7 +11,7 @@ interface TripFormProps {
 
 const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
   const [formData, setFormData] = useState<TripFormData>({
-    travelType: 'flight',
+    travelType: 'road',
     origin: '',
     destination: '',
     startDate: '',
