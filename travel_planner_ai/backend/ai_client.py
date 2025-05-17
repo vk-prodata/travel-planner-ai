@@ -290,6 +290,7 @@ class AIClient:
              "    - Why it's recommended at this specific time/location\\n"
              "    - How it fits with the overall itinerary"),
             "11. If destination is a park or related to a nature or user has chosen \"Outdoor\" activity, suggest a nature activity: trails, hikes, etc.",
+            "12. Strive to include activities or places that have a Google Maps rating of at least 4.5 and more than 100 reviews",
             "",
             "Remember to follow all formatting rules above and incorporate the breakdown by date/city."
         ]
