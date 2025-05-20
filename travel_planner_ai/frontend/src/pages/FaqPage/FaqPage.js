@@ -181,7 +181,6 @@ const FaqPage = () => {
             <li><strong>Be Specific with Interests:</strong> The more details you provide about your interests (including "Advanced Settings" like cousine, bugget, etc.), the better the AI can tailor the itinerary to your preferences."</li>
             <li><strong>Provide Clear Travel Dates:</strong> Accurate start and end dates help the AI plan a realistic schedule, considering travel times and opening hours of attractions.</li>
             <li><strong>Choose Your Entertainment Preferences:</strong> Are you looking for a outdoor family-friendly activity with visitin must see place. Be sure that you've chosen: Outdoor, Family-friendly and Must see.</li>
-            <li><strong>List "Must-See" Attractions:</strong> If there are specific places you definitely want to visit, list them. The AI will try to incorporate these into your plan.</li>
           </ul>
         </FaqItem>
 
