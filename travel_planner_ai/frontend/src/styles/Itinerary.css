@@ -60,6 +60,37 @@
   gap: 0.5rem;
 }
 
+/* Custom preferences container */
+.custom-preferences-container {
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  padding: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.custom-preferences-container .input-group {
+  flex-wrap: nowrap;
+}
+
+.custom-preferences-container .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.custom-preferences-container .btn {
+  margin-left: -1px;
+}
+
+.custom-preferences-container .btn:not(:last-child) {
+  border-radius: 0;
+}
+
+.custom-preferences-container .btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 /* Restaurant options styling */
 .restaurant-options {
   margin-top: 10px;
@@ -71,10 +102,41 @@
   background-color: #f8f9fa;
   border-left: 3px solid #28a745;
   border-radius: 4px;
+  line-height: 1.5;
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .restaurant-option strong {
   color: #28a745;
+}
+
+/* Fix for numbers in lists */
+.restaurant-option strong:first-child,
+.restaurant-option span:first-child {
+  display: inline-block;
+  margin-right: 5px;
+}
+
+/* Action buttons container */
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+}
+
+/* Button styling for icon-only buttons */
+.refresh-button,
+.delete-button {
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.refresh-button:hover,
+.delete-button:hover {
+  transform: scale(1.05);
 }
 
 /* Animation for refresh button */
@@ -100,5 +162,16 @@
   
   .itinerary .d-flex.gap-2 {
     margin-top: 10px;
+  }
+
+  .custom-preferences-container .input-group {
+    flex-wrap: wrap;
+  }
+
+  .custom-preferences-container .form-control,
+  .custom-preferences-container .btn {
+    border-radius: 4px;
+    margin: 2px 0;
+    width: 100%;
   }
 } 

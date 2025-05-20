@@ -6,7 +6,7 @@ import Itinerary from './components/Itinerary';
 import TripTitleExport from './components/TripTitleExport';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
+import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare, FaShareAlt, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 import { saveTrip, updateTrip, getTripById } from './services/tripService';
@@ -21,6 +21,7 @@ import { generateItinerary } from './services/itineraryService';
 import './styles/App.css';
 import FaqPage from './pages/FaqPage/FaqPage';
 import ical from 'ical-generator';
+import SEO from './components/SEO';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
@@ -133,7 +134,8 @@ const MainApp = () => {
             setCurrentTripId(trip.id);
             setHasUnsavedChanges(false);
             
-            if (user) {
+            // Only show success message if user is logged in and coming from the trips list page
+            if (user && document.referrer.includes('/trips')) {
               notifySuccess('Trip loaded successfully!');
             }
             
@@ -535,7 +537,7 @@ const MainApp = () => {
     }
   }, [itinerary, localItinerary]);
 
-  const refreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity) => {
+  const refreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity, customPreferences?: string) => {
     if (!user || !formData) {
       notifyError('Please sign in to refresh activities', user?.email);
       return;
@@ -551,7 +553,8 @@ const MainApp = () => {
         body: JSON.stringify({
           day_index: dayIndex,
           activity_index: activityIndex,
-          activity: activity
+          activity: activity,
+          custom_preferences: customPreferences || ''
         })
       });
 
@@ -703,312 +706,241 @@ const MainApp = () => {
     }
   };
 
+  // Create dynamic SEO data based on the current trip
+  const getSeoData = () => {
+    if (!formData) {
+      return {
+        title: 'Create Your Travel Itinerary - Travel Planner AI',
+        description: 'Plan your perfect trip with our AI-powered travel planner. Create personalized itineraries based on your preferences.',
+        url: '/'
+      };
+    }
+    
+    const destination = formData.destination;
+    const tripDates = formData.startDate && formData.endDate 
+      ? `${new Date(formData.startDate).toLocaleDateString()} - ${new Date(formData.endDate).toLocaleDateString()}`
+      : 'Upcoming trip';
+    
+    return {
+      title: `${destination} Trip Itinerary - Travel Planner AI`,
+      description: `View your personalized travel itinerary for ${destination} (${tripDates}). Day-by-day activities and recommendations.`,
+      url: currentTripId ? `/?tripId=${currentTripId}` : '/'
+    };
+  };
+
+  const seoData = getSeoData();
+
   return (
-    <Container fluid className="p-0 min-vh-100 d-flex flex-column">
-      <Row className="g-0">
-        <Col md={4} className="border-end shadow-sm order-2 order-md-1" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
-          <div className="p-2">
-            <div className="bg-light p-2 rounded shadow-sm">
-              <div className="d-flex justify-content-end align-items-center mb-3">
-                <div className="d-flex align-items-center">
-                  <LoggingToggle />
-                  {!user ? (
-                    !isReadOnlyMode && (
-                      <div className="d-flex align-items-center">
-                        <Button
+    <div className="App">
+      <SEO 
+        title={seoData.title}
+        description={seoData.description}
+        url={seoData.url}
+      />
+      
+      <Container fluid className="p-0 min-vh-100 d-flex flex-column">
+        <Row className="g-0">
+          <Col md={4} className="border-end shadow-sm order-2 order-md-1" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
+            <div className="p-2">
+              <div className="bg-light p-2 rounded shadow-sm">
+                <div className="d-flex justify-content-end align-items-center mb-3">
+                  <div className="d-flex align-items-center">
+                    <LoggingToggle />
+                    {!user ? (
+                      !isReadOnlyMode && (
+                        <div className="d-flex align-items-center">
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            onClick={() => navigate('/faq')}
+                            className="rounded-pill me-2"
+                          >
+                            FAQ
+                          </Button>
+                        </div>
+                      )
+                    ) : (
+                      <div className="d-flex flex-wrap align-items-center gap-2">
+                        <CreditsDisplay />
+                        <Button 
+                          variant="outline-primary" 
+                          size="sm" 
+                          onClick={() => navigate('/trips')}
+                          className="rounded-pill"
+                        >
+                          <FaList className="me-1" /> My Trips
+                        </Button>
+                        <Button 
                           variant="outline-primary"
-                          size="sm"
+                          size="sm" 
                           onClick={() => navigate('/faq')}
-                          className="rounded-pill me-2"
+                          className="rounded-pill"
                         >
                           FAQ
                         </Button>
+                        <Button 
+                          variant="outline-danger" 
+                          size="sm" 
+                          onClick={signOut}
+                          className="rounded-pill"
+                        >
+                          Sign Out
+                        </Button>
                       </div>
-                    )
-                  ) : (
-                    <div className="d-flex flex-wrap align-items-center gap-2">
-                      <CreditsDisplay />
-                      <Button 
-                        variant="outline-primary" 
-                        size="sm" 
-                        onClick={() => navigate('/trips')}
-                        className="rounded-pill"
-                      >
-                        <FaList className="me-1" /> My Trips
-                      </Button>
-                      <Button 
-                        variant="outline-primary"
-                        size="sm" 
-                        onClick={() => navigate('/faq')}
-                        className="rounded-pill"
-                      >
-                        FAQ
-                      </Button>
-                      <Button 
-                        variant="outline-danger" 
-                        size="sm" 
-                        onClick={signOut}
-                        className="rounded-pill"
-                      >
-                        Sign Out
-                      </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="mb-4">
-                <div className="d-flex align-items-center">
-                  <FaPlaneDeparture className="me-2 text-secondary" size={20} />
-                  <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
+                <div className="mb-4">
+                  <div className="d-flex align-items-center">
+                    <FaPlaneDeparture className="me-2 text-secondary" size={20} />
+                    <h2 className="text-primary-dark m-0 fs-4">Travel Planner AI</h2>
+                  </div>
                 </div>
+                <TripForm onSubmit={handleSubmit} isLoading={isLoading} user={user} />
               </div>
-              <TripForm onSubmit={handleSubmit} isLoading={isLoading} user={user} />
             </div>
-          </div>
-        </Col>
+          </Col>
 
-        <Col md={8} className="bg-light order-1 order-md-2">
-          <div className="p-4">
-            {isLoading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
+          <Col md={8} className="bg-light order-1 order-md-2">
+            <div className="p-4">
+              {isLoading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2 text-primary-dark">Generating your perfect trip...</p>
                 </div>
-                <p className="mt-2 text-primary-dark">Generating your perfect trip...</p>
-              </div>
-            ) : itinerary ? (
-              <div>
-                {(isReadOnlyMode || !user) && (
-                  <ReadOnlyBanner isReadOnlyMode={isReadOnlyMode} />
-                )}
-                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-                  {isEditingTitle ? (
-                    <div className="d-flex align-items-center gap-2">
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={editedTitle}
-                        onChange={(e) => setEditedTitle(e.target.value)}
-                        autoFocus
-                      />
-                      <Button 
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={handleTitleSave}
-                      >
-                        <FaSave size={14} />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
+              ) : itinerary ? (
+                <div>
+                  {(isReadOnlyMode || !user) && (
+                    <ReadOnlyBanner isReadOnlyMode={isReadOnlyMode} />
+                  )}
+                  <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+                    {isEditingTitle ? (
                       <div className="d-flex align-items-center gap-2">
-                        <h3 className="text-primary-dark m-0">
-                          {getTripTitle()}
-                        </h3>
-                        <div className="d-flex gap-2 align-items-center">
-                          <Button 
-                            variant="link"
-                            size="sm"
-                            className="p-0 text-secondary"
-                            onClick={() => {
-                              setEditedTitle(getTripTitle());
-                              setIsEditingTitle(true);
-                            }}
-                          >
-                            <FaEdit size={14} />
-                          </Button>
-                          {itinerary && formData && (
-                            <TripTitleExport itinerary={itinerary} formData={formData} />
-                          )}
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={editedTitle}
+                          onChange={(e) => setEditedTitle(e.target.value)}
+                          autoFocus
+                        />
+                        <Button 
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={handleTitleSave}
+                        >
+                          <FaSave size={14} />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <div className="d-flex align-items-center gap-2">
+                          <h3 className="text-primary-dark m-0">
+                            {getTripTitle()}
+                          </h3>
+                          <div className="d-flex gap-2 align-items-center">
+                            <Button 
+                              variant="link"
+                              size="sm"
+                              className="p-0 text-secondary"
+                              onClick={() => {
+                                setEditedTitle(getTripTitle());
+                                setIsEditingTitle(true);
+                              }}
+                            >
+                              <FaEdit size={14} />
+                            </Button>
+                            {itinerary && formData && (
+                              <TripTitleExport itinerary={itinerary} formData={formData} />
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <div className="d-flex gap-2 flex-wrap">
-                    {user ? (
-                      <>
-                        <Button
-                          variant="primary"
-                          onClick={handleSaveTrip}
-                          disabled={isSaving || !hasUnsavedChanges || isReadOnlyMode}
-                          className="d-flex align-items-center gap-2"
-                          style={{ minWidth: '140px' }}
-                        >
-                          {isSaving ? (
-                            <>
+                    )}
+                    <div className="d-flex gap-2 flex-wrap">
+                      {user ? (
+                        <>
+                          <Button
+                            variant="primary"
+                            onClick={handleSaveTrip}
+                            disabled={isSaving || !hasUnsavedChanges || isReadOnlyMode}
+                            className="d-flex align-items-center justify-content-center"
+                            style={{ width: '40px', height: '40px', padding: '0' }}
+                            title="Save Changes"
+                          >
+                            {isSaving ? (
                               <span className="spinner-border spinner-border-sm" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <FaSave />
-                              {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
-                            </>
-                          )}
-                        </Button>
-                        {currentTripId && itinerary && formData && (
-                          <Dropdown>
-                            <Dropdown.Toggle
-                              variant="outline-primary"
-                              id="share-dropdown-button"
-                              className="d-flex align-items-center gap-2"
-                            >
-                              <FaShare className="me-1" />
-                              Share
-                            </Dropdown.Toggle>
-                            <Dropdown.Menu>
-                              <Dropdown.Item
-                                onClick={() => {
-                                  const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
-                                  navigator.clipboard.writeText(shareUrl);
-                                  notifySuccess('Share URL copied to clipboard!');
-                                }}
+                            ) : (
+                              <FaSave size={18} />
+                            )}
+                          </Button>
+                          {currentTripId && itinerary && formData && (
+                            <Dropdown>
+                              <Dropdown.Toggle
+                                variant="outline-primary"
+                                id="share-dropdown-button"
+                                className="d-flex align-items-center justify-content-center"
+                                style={{ width: '40px', height: '40px', padding: '0' }}
+                                title="Share"
                               >
-                                <FaCopy className="me-2" />
-                                Copy Link
-                              </Dropdown.Item>
-                              <Dropdown.Divider />
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={() => { 
-                                  const shareUrl = encodeURIComponent(window.location.href);
-                                  const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
-                                  const whatsappUrl = `https://wa.me/?text=${shareTitle}%20${shareUrl}`;
-                                  window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-                                  notifySuccess('WhatsApp share window opened!');
-                                }}
-                              >
-                                <FaWhatsapp className="me-2 text-success" />
-                                Share via WhatsApp
-                              </Dropdown.Item>
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={() => { 
-                                  const shareUrl = encodeURIComponent(window.location.href);
-                                  const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
-                                  const telegramUrl = `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`;
-                                  window.open(telegramUrl, '_blank', 'noopener,noreferrer');
-                                  notifySuccess('Telegram share window opened!');
-                                }}
-                              >
-                                <FaTelegram className="me-2 text-primary" />
-                                Share via Telegram
-                              </Dropdown.Item>
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={() => { 
-                                  // For Facebook, we only need the URL
-                                  const shareUrl = encodeURIComponent(window.location.href);
-                                  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
-                                  window.open(facebookUrl, '_blank', 'noopener,noreferrer');
-                                  notifySuccess('Facebook share window opened!');
-                                }}
-                              >
-                                <FaFacebook className="me-2 text-primary" />
-                                Share via Facebook
-                              </Dropdown.Item>
-                              <Dropdown.Divider />
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={() => { 
-                                  // Generate trip description
-                                  let description = `Trip to ${formData.destination}\n`;
-                                  description += `${formData.startDate} - ${formData.endDate}\n\n`;
-                                  
-                                  itinerary.days.forEach((day, index) => {
-                                    description += `Day ${index + 1} - ${day.date}:\n`;
-                                    day.activities.forEach(activity => {
-                                      description += `  ${activity.time} - ${activity.description}\n`;
-                                    });
-                                    description += '\n';
-                                  });
-                                  
-                                  // Create and download text file
-                                  const blob = new Blob([description], { type: 'text/plain' });
-                                  const url = window.URL.createObjectURL(blob);
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.setAttribute('download', `trip-to-${formData.destination}.txt`);
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                  window.URL.revokeObjectURL(url);
-                                  notifySuccess('Text file exported successfully!');
-                                }}
-                              >
-                                <FaFileAlt className="me-2" />
-                                Export as Text
-                              </Dropdown.Item>
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={() => { 
-                                  // Create and download JSON file
-                                  const data = {
-                                    formData,
-                                    itinerary
-                                  };
-                                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                                  const url = window.URL.createObjectURL(blob);
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.setAttribute('download', `trip-to-${formData.destination}.json`);
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                  window.URL.revokeObjectURL(url);
-                                  notifySuccess('JSON file exported successfully!');
-                                }}
-                              >
-                                <FaFileDownload className="me-2" />
-                                Export as JSON
-                              </Dropdown.Item>
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={() => { 
-                                  // Generate trip description for calendar
-                                  let description = `Trip to ${formData.destination}\n\n`;
-                                  
-                                  itinerary.days.forEach((day, index) => {
-                                    description += `Day ${index + 1} - ${day.date}:\n`;
-                                    day.activities.forEach(activity => {
-                                      description += `  ${activity.time} - ${activity.description}\n`;
-                                    });
-                                    description += '\n';
-                                  });
-                                  
-                                  // Create calendar file
-                                  const calendar = ical();
-                                  const startDate = new Date(formData.startDate);
-                                  const endDate = new Date(formData.endDate);
-                                  
-                                  calendar.createEvent({
-                                    start: startDate,
-                                    end: endDate,
-                                    summary: `Trip to ${formData.destination}`,
-                                    description: description,
-                                    location: formData.destination
-                                  });
-                                  
-                                  // Download calendar file
-                                  const blob = new Blob([calendar.toString()], { type: 'text/calendar' });
-                                  const url = window.URL.createObjectURL(blob);
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.setAttribute('download', `trip-to-${formData.destination}.ics`);
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                  window.URL.revokeObjectURL(url);
-                                  notifySuccess('Calendar file exported successfully!');
-                                }}
-                              >
-                                <FaCalendarAlt className="me-2" />
-                                Add to Calendar (ICS)
-                              </Dropdown.Item>
-                              <Dropdown.Item 
-                                as="button" 
-                                onClick={async () => { 
-                                  try {
+                                <FaShareAlt size={18} />
+                              </Dropdown.Toggle>
+                              <Dropdown.Menu>
+                                <Dropdown.Item
+                                  onClick={() => {
+                                    const shareUrl = `${window.location.origin}/?tripId=${currentTripId}`;
+                                    navigator.clipboard.writeText(shareUrl);
+                                    notifySuccess('Share URL copied to clipboard!');
+                                  }}
+                                >
+                                  <FaCopy className="me-2" />
+                                  Copy Link
+                                </Dropdown.Item>
+                                <Dropdown.Divider />
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={() => { 
+                                    const shareUrl = encodeURIComponent(window.location.href);
+                                    const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
+                                    const whatsappUrl = `https://wa.me/?text=${shareTitle}%20${shareUrl}`;
+                                    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+                                    notifySuccess('WhatsApp share window opened!');
+                                  }}
+                                >
+                                  <FaWhatsapp className="me-2 text-success" />
+                                  Share via WhatsApp
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={() => { 
+                                    const shareUrl = encodeURIComponent(window.location.href);
+                                    const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
+                                    const telegramUrl = `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`;
+                                    window.open(telegramUrl, '_blank', 'noopener,noreferrer');
+                                    notifySuccess('Telegram share window opened!');
+                                  }}
+                                >
+                                  <FaTelegram className="me-2 text-primary" />
+                                  Share via Telegram
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={() => { 
+                                    // For Facebook, we only need the URL
+                                    const shareUrl = encodeURIComponent(window.location.href);
+                                    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
+                                    window.open(facebookUrl, '_blank', 'noopener,noreferrer');
+                                    notifySuccess('Facebook share window opened!');
+                                  }}
+                                >
+                                  <FaFacebook className="me-2 text-primary" />
+                                  Share via Facebook
+                                </Dropdown.Item>
+                                <Dropdown.Divider />
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={() => { 
                                     // Generate trip description
                                     let description = `Trip to ${formData.destination}\n`;
                                     description += `${formData.startDate} - ${formData.endDate}\n\n`;
@@ -1021,95 +953,206 @@ const MainApp = () => {
                                       description += '\n';
                                     });
                                     
-                                    // Copy to clipboard
-                                    await navigator.clipboard.writeText(description);
-                                    notifySuccess('Trip details copied to clipboard!');
-                                  } catch (error) {
-                                    notifyError('Failed to copy trip details to clipboard', user?.email);
-                                  }
-                                }}
-                              >
-                                <FaCopy className="me-2" />
-                                Copy to Clipboard
-                              </Dropdown.Item>
-                            </Dropdown.Menu>
-                          </Dropdown>
-                        )}
-                      </>
-                    ) : (
-                      <div className="d-flex align-items-center gap-2">
-                        <Button
-                          variant="outline-primary"
-                          disabled
-                          className="d-flex align-items-center gap-2"
-                          style={{ minWidth: '140px' }}
-                        >
-                          <FaSave />
-                          Save Trip
-                        </Button>
-                        <small className="text-muted">
-                          Sign in to save
-                        </small>
-                      </div>
-                    )}
+                                    // Create and download text file
+                                    const blob = new Blob([description], { type: 'text/plain' });
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `trip-to-${formData.destination}.txt`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    window.URL.revokeObjectURL(url);
+                                    notifySuccess('Text file exported successfully!');
+                                  }}
+                                >
+                                  <FaFileAlt className="me-2" />
+                                  Export as Text
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={() => { 
+                                    // Create and download JSON file
+                                    const data = {
+                                      formData,
+                                      itinerary
+                                    };
+                                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `trip-to-${formData.destination}.json`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    window.URL.revokeObjectURL(url);
+                                    notifySuccess('JSON file exported successfully!');
+                                  }}
+                                >
+                                  <FaFileDownload className="me-2" />
+                                  Export as JSON
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={() => { 
+                                    // Generate trip description for calendar
+                                    let description = `Trip to ${formData.destination}\n\n`;
+                                    
+                                    itinerary.days.forEach((day, index) => {
+                                      description += `Day ${index + 1} - ${day.date}:\n`;
+                                      day.activities.forEach(activity => {
+                                        description += `  ${activity.time} - ${activity.description}\n`;
+                                      });
+                                      description += '\n';
+                                    });
+                                    
+                                    // Create calendar file
+                                    const calendar = ical();
+                                    const startDate = new Date(formData.startDate);
+                                    const endDate = new Date(formData.endDate);
+                                    
+                                    calendar.createEvent({
+                                      start: startDate,
+                                      end: endDate,
+                                      summary: `Trip to ${formData.destination}`,
+                                      description: description,
+                                      location: formData.destination
+                                    });
+                                    
+                                    // Download calendar file
+                                    const blob = new Blob([calendar.toString()], { type: 'text/calendar' });
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `trip-to-${formData.destination}.ics`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    window.URL.revokeObjectURL(url);
+                                    notifySuccess('Calendar file exported successfully!');
+                                  }}
+                                >
+                                  <FaCalendarAlt className="me-2" />
+                                  Add to Calendar (ICS)
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                  as="button" 
+                                  onClick={async () => { 
+                                    try {
+                                      // Generate trip description
+                                      let description = `Trip to ${formData.destination}\n`;
+                                      description += `${formData.startDate} - ${formData.endDate}\n\n`;
+                                      
+                                      itinerary.days.forEach((day, index) => {
+                                        description += `Day ${index + 1} - ${day.date}:\n`;
+                                        day.activities.forEach(activity => {
+                                          description += `  ${activity.time} - ${activity.description}\n`;
+                                        });
+                                        description += '\n';
+                                      });
+                                      
+                                      // Copy to clipboard
+                                      await navigator.clipboard.writeText(description);
+                                      notifySuccess('Trip details copied to clipboard!');
+                                    } catch (error) {
+                                      notifyError('Failed to copy trip details to clipboard', user?.email);
+                                    }
+                                  }}
+                                >
+                                  <FaCopy className="me-2" />
+                                  Copy to Clipboard
+                                </Dropdown.Item>
+                              </Dropdown.Menu>
+                            </Dropdown>
+                          )}
+                        </>
+                      ) : (
+                        <div className="d-flex align-items-center gap-2">
+                          <Button
+                            variant="outline-primary"
+                            disabled
+                            className="d-flex align-items-center gap-2"
+                            style={{ minWidth: '140px' }}
+                          >
+                            <FaSave />
+                            Save Trip
+                          </Button>
+                          <small className="text-muted">
+                            Sign in to save
+                          </small>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Itinerary 
+                    itinerary={itinerary}
+                    onActivityUpdate={handleActivityUpdate}
+                    onActivityDelete={handleActivityDelete}
+                    onActivityRefresh={refreshActivity}
+                    isLoading={isLoading}
+                    isOwner={itinerary?.isOwner}
+                    isReadOnly={isReadOnlyMode}
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-1">
+                  {!user && (
+                    <ReadOnlyBanner isReadOnlyMode={false} />
+                  )}
+                  <div className="bg-white p-5 rounded shadow-sm">
+                    <h3 className="text-primary-dark mb-3">Plan Your Dream Trip</h3>
+                    <p className="text-secondary mb-4">Fill out the form to get your personalized travel itinerary</p>
+                    <div className="text-center">
+                      <FaPlaneDeparture size={100} className="text-secondary opacity-50" />
+                    </div>
                   </div>
                 </div>
-                <Itinerary 
-                  itinerary={itinerary}
-                  onActivityUpdate={handleActivityUpdate}
-                  onActivityDelete={handleActivityDelete}
-                  onActivityRefresh={refreshActivity}
-                  isLoading={isLoading}
-                  isOwner={itinerary?.isOwner}
-                  isReadOnly={isReadOnlyMode}
-                />
-              </div>
-            ) : (
-              <div className="text-center py-1">
-                {!user && (
-                  <ReadOnlyBanner isReadOnlyMode={false} />
-                )}
-                <div className="bg-white p-5 rounded shadow-sm">
-                  <h3 className="text-primary-dark mb-3">Plan Your Dream Trip</h3>
-                  <p className="text-secondary mb-4">Fill out the form to get your personalized travel itinerary</p>
-                  <div className="text-center">
-                    <FaPlaneDeparture size={100} className="text-secondary opacity-50" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </Col>
-      </Row>
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-        toastStyle={{
-          backgroundColor: '#363636',
-          color: '#fff'
-        }}
-      />
-    </Container>
+              )}
+            </div>
+          </Col>
+        </Row>
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="colored"
+          toastStyle={{
+            backgroundColor: '#363636',
+            color: '#fff'
+          }}
+        />
+      </Container>
+    </div>
   );
 };
 
 const App = () => {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<MainApp />} />
-        <Route path="/trips" element={<TripList />} />
-        <Route path="/credits" element={<Credits />} />
-        <Route path="/faq" element={<FaqPage />} />
-      </Routes>
+      <div className="App">
+        <ToastContainer position="top-right" autoClose={5000} />
+        <Routes>
+          <Route path="/" element={<MainApp />} />
+          <Route path="/trips" element={<TripList />} />
+          <Route path="/credits" element={<Credits />} />
+          <Route path="/faq" element={
+            <>
+              <SEO 
+                title="FAQ - Travel Planner AI"
+                description="Frequently asked questions about Travel Planner AI. Learn how to use our platform effectively."
+                url="/faq"
+              />
+              <FaqPage />
+            </>
+          } />
+        </Routes>
+      </div>
     </Router>
   );
 };

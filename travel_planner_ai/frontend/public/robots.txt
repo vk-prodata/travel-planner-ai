@@ -1,3 +1,10 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Sitemap: https://travelplannerai.org/sitemap.xml
+
+# Prevent crawling of authentication and API routes
+Disallow: /api/
+Disallow: /auth/
+Disallow: /login/
+Disallow: /signup/

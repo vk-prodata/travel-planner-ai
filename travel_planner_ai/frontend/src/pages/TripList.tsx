@@ -10,6 +10,7 @@ import { notifyError, notifySuccess } from '../services/errorService';
 import LoggingToggle from '../components/LoggingToggle';
 import CreditsDisplay from '../components/CreditsDisplay';
 import { SavedTrip } from '../types';
+import SEO from '../components/SEO';
 
 const TripList: React.FC = () => {
   const { user } = useAuth();
@@ -140,6 +141,11 @@ const TripList: React.FC = () => {
   if (!user) {
     return (
       <>
+        <SEO 
+          title="Sign in to View Your Trips - Travel Planner AI"
+          description="Sign in to access and manage your saved trips with Travel Planner AI."
+          url="/trips"
+        />
         <Navbar bg="light" expand="lg" className="px-3 shadow-sm">
           <Navbar.Brand onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
             <FaPlane className="me-2" />
@@ -163,6 +169,11 @@ const TripList: React.FC = () => {
 
   return (
     <>
+      <SEO 
+        title="My Trips - Travel Planner AI"
+        description="View and manage all your saved trips and travel itineraries."
+        url="/trips"
+      />
       <Navbar bg="light" expand="lg" className="px-3 shadow-sm">
         <Navbar.Brand onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <FaPlane className="me-2" />

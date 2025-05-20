@@ -10,17 +10,6 @@ class BudgetLevel(str, Enum):
     mid_range = "mid_range"
     luxury = "luxury"
 
-class TripDetails(BaseModel):
-    travel_type: str
-    departure: str
-    destination: str
-    start_date: date
-    end_date: date
-    num_adults: int = Field(..., ge=1)
-    num_children: Optional[int] = 0
-    num_infants: Optional[int] = 0
-    intermediate_stops: Optional[List[str]] = []
-
 class Activity(BaseModel):
     id: str
     time: str
@@ -96,13 +85,6 @@ class TripUpdate(BaseModel):
             }
         }
     )
-
-class TripRequest(BaseModel):
-    trip_details: TripDetails
-    preferences: dict
-    budget: dict
-    ai_model: dict
-    language: str = "en"
 
 class TripResponse(BaseModel):
     id: str

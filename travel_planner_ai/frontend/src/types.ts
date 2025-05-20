@@ -16,6 +16,9 @@ export interface SignupData extends LoginData {
   name: string;
 }
 
+// AI provider type
+export type AIProvider = 'openai' | 'deepseek';
+
 // Trip related types
 export interface Activity {
   id: string;
@@ -70,6 +73,7 @@ export interface TripFormData {
   budget: string;
   language: string;
   cuisinePreference: CuisineType;
+  aiProvider?: AIProvider;
 }
 
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';

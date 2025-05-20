@@ -38,6 +38,7 @@ class RefreshActivityRequest(BaseModel):
     day_index: int
     activity_index: int
     activity: dict
+    custom_preferences: str = ""
 
 @router.post("/trips")
 async def create_trip(
@@ -289,6 +290,10 @@ async def generate_itinerary(
         # Log request data
         logger.info(f"Request data: {json.dumps(trip_request.formData, indent=2)}")
         
+        # Get AI provider from request or default to OpenAI
+        ai_provider = trip_request.formData.get('aiProvider', 'openai')
+        logger.info(f"Using AI provider: {ai_provider}")
+        
         # Deduct credits based on trip days
         user_id = current_user["id"]
         try:
@@ -298,8 +303,11 @@ async def generate_itinerary(
             # Re-raise the exception to send appropriate error response to frontend
             raise credit_error
 
-        # Generate itinerary using AI
+        # Generate itinerary using AI with the specified provider
         try:
+            # Force the AI client to use the specified provider
+            ai_client.set_provider(ai_provider)
+            
             itinerary = await ai_client.generate_itinerary(trip_request.formData)
             
             # Log raw AI response
@@ -328,7 +336,7 @@ async def generate_itinerary(
                     if not activity.get('id'):
                         activity['id'] = f"{day['date']}-{id(activity)}"
 
-            logger.info(f"Successfully formatted itinerary for {current_user.get('email')}")
+            logger.info(f"Successfully formatted itinerary for {current_user.get('email')} using {ai_provider} provider")
             logger.debug(f"Final formatted itinerary: {json.dumps(itinerary, indent=2)}")
             
             # Add tripId and isOwner flag
@@ -341,10 +349,10 @@ async def generate_itinerary(
             }
             
         except Exception as e:
-            logger.error(f"Error generating itinerary: {str(e)}", exc_info=True)
+            logger.error(f"Error generating itinerary with {ai_provider} provider: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Dear {current_user.get('email')}, we encountered an error: {str(e)}"
+                detail=f"Dear {current_user.get('email')}, we encountered an error with {ai_provider} provider: {str(e)}"
             )
 
     except HTTPException as he:
@@ -387,6 +395,17 @@ async def refresh_activity(
         logger.info(f"Refreshing activity for user {current_user.get('email')}")
         logger.debug(f"Request data: {request}")
         
+        # Check if we have an AI provider preference set in user's session or data
+        # For now, we'll default to OpenAI as the provider for activity refreshes
+        ai_provider = "openai"  # Default provider
+        
+        # If using a consistent provider across the application, 
+        # you might retrieve it from a user setting or session
+        # ai_provider = current_user.get("preferred_ai_provider", "openai")
+        
+        # Set the AI provider for this request
+        ai_client.set_provider(ai_provider)
+        
         activity_type = request.activity.get('type', 'activity').lower()
         is_meal = activity_type == 'meal' or activity_type == 'food'
         
@@ -415,11 +434,26 @@ async def refresh_activity(
         6. For the Coordinates field, provide the latitude and longitude if available, otherwise leave it blank
         """
         
+        # Add user custom preferences if provided
+        if request.custom_preferences:
+            prompt += f"""
+        7. The user has specified the following preferences for this activity:
+           "{request.custom_preferences}"
+           Make sure the generated activity strongly aligns with these preferences.
+        """
+        
         # Add specific instructions for meal activities
         if is_meal:
             prompt += """
-        7. For meal activities, provide 2-3 specific restaurant options with brief descriptions
-           Format the description like this: "Options include: 1. Restaurant Name - Brief description of cuisine and ambiance. 2. Restaurant Name - Brief description."
+        8. For meal activities, provide 2-3 specific restaurant options with brief descriptions
+           Format the description exactly like this: 
+           "Options include: 
+           1. Restaurant Name - Brief description of cuisine and ambiance. 
+           2. Restaurant Name - Brief description. 
+           3. Restaurant Name - Brief description."
+           
+           IMPORTANT: Make sure each numbered restaurant option is on its own line, and use proper spacing.
+           Do NOT split restaurant names across multiple lines.
         """
         
         try:
@@ -440,7 +474,7 @@ async def refresh_activity(
             )
             
             content = response.choices[0].message.content
-            logger.debug(f"AI response for refresh: {content}")
+            logger.debug(f"AI response for refresh using {ai_provider} provider: {content}")
             
             # Parse the new activity
             lines = [line.strip() for line in content.split('\n') if line.strip()]
@@ -473,7 +507,7 @@ async def refresh_activity(
             if not new_activity.get('description'):
                 raise ValueError("No description generated for new activity")
             
-            logger.info(f"Successfully generated new activity: {json.dumps(new_activity, indent=2)}")
+            logger.info(f"Successfully generated new activity with {ai_provider} provider: {json.dumps(new_activity, indent=2)}")
             
             return {
                 "success": True,
@@ -481,14 +515,13 @@ async def refresh_activity(
             }
             
         except Exception as e:
-            logger.error(f"Error generating new activity: {str(e)}", exc_info=True)
+            logger.error(f"Error refreshing activity with {ai_provider}: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(e)
+                detail=f"Failed to refresh activity: {str(e)}"
             )
-            
     except Exception as e:
-        logger.error(f"Error refreshing activity: {str(e)}", exc_info=True)
+        logger.error(f"Error in refresh activity endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

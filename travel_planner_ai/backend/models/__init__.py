@@ -5,8 +5,7 @@ from .trip import (
     TripHash,
     Activity,
     DailyItinerary,
-    TripItinerary,
-    TripRequest
+    TripItinerary
 )
 from .user import User
 
@@ -18,6 +17,5 @@ __all__ = [
     'Activity',
     'DailyItinerary',
     'TripItinerary',
-    'TripRequest',
     'User'
 ]

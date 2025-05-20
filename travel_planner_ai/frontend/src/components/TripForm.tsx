@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Button, Row, Col, OverlayTrigger, Tooltip, Accordion, Badge } from 'react-bootstrap';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
-import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType } from '../types';
+import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType, AIProvider } from '../types';
 
 interface TripFormProps {
   onSubmit: (data: TripFormData) => void;
@@ -24,7 +24,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
     budgetLevel: 'mid-range',
     budget: 'mid-range',
     language: 'en',
-    cuisinePreference: 'any'
+    cuisinePreference: 'any',
+    aiProvider: 'openai' // Default to OpenAI
   });
 
   const [newStop, setNewStop] = useState<Stop>({ 
@@ -480,6 +481,37 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
                 <option value="it">Italian (Italiano)</option>
                 <option value="ru">Russian (Русский)</option>
                 <option value="zh">Chinese (中文)</option>
+              </Form.Select>
+            </Form.Group>
+
+            {/* AI Provider */}
+            <Form.Group className="mb-3">
+              <Form.Label className="d-flex align-items-center">
+                AI Provider
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id="ai-provider-tooltip">
+                      <div className="text-start">
+                        <strong>Select AI provider:</strong>
+                        <div>OpenAI: High quality, standard option</div>
+                        <div>DeepSeek: Cost-efficient model optimized for reasoning</div>
+                      </div>
+                    </Tooltip>
+                  }
+                >
+                  <span className="ms-2">
+                    <FaInfoCircle className="text-secondary" size={14} />
+                  </span>
+                </OverlayTrigger>
+              </Form.Label>
+              <Form.Select
+                className="shadow-sm"
+                value={formData.aiProvider || 'openai'}
+                onChange={(e) => setFormData({...formData, aiProvider: e.target.value as AIProvider})}
+              >
+                <option value="openai">OpenAI (Default)</option>
+                <option value="deepseek">DeepSeek</option>
               </Form.Select>
             </Form.Group>
           </Accordion.Body>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Card, Button, Alert } from 'react-bootstrap';
+import { Card, Button, Alert, Form, InputGroup } from 'react-bootstrap';
 import { TripItinerary, Activity } from '../types';
 import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt, BsChevronUp, BsChevronDown } from 'react-icons/bs';
+import { FaPaperPlane, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import '../styles/Itinerary.css';
 
@@ -9,7 +10,7 @@ interface ItineraryProps {
   itinerary: TripItinerary;
   onActivityUpdate: (dayIndex: number, activityIndex: number, updatedActivity: Activity) => void;
   onActivityDelete: (dayIndex: number, activityIndex: number) => void;
-  onActivityRefresh: (dayIndex: number, activityIndex: number, activity: Activity) => Promise<void>;
+  onActivityRefresh: (dayIndex: number, activityIndex: number, activity: Activity, customPreferences?: string) => Promise<void>;
   isLoading: boolean;
   isOwner?: boolean;
   isReadOnly?: boolean;
@@ -27,6 +28,8 @@ const Itinerary: React.FC<ItineraryProps> = ({
   const [altSuggestions, setAltSuggestions] = useState<{[key: string]: string}>({});
   const [refreshingActivities, setRefreshingActivities] = useState<{[key: string]: boolean}>({});
   const [expandedDays, setExpandedDays] = useState<{[key: string]: boolean}>({});
+  const [showCustomPreferences, setShowCustomPreferences] = useState<{[key: string]: boolean}>({});
+  const [customPreferences, setCustomPreferences] = useState<{[key: string]: string}>({});
 
   const toggleDayExpanded = (dayIndex: number) => {
     setExpandedDays(prev => ({
@@ -39,19 +42,64 @@ const Itinerary: React.FC<ItineraryProps> = ({
     return expandedDays[dayIndex] ?? true;
   };
 
+  const toggleCustomPreferences = (activityKey: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setShowCustomPreferences(prev => ({
+      ...prev,
+      [activityKey]: !prev[activityKey]
+    }));
+  };
+
+  const handleCustomPreferencesChange = (activityKey: string, value: string) => {
+    setCustomPreferences(prev => ({
+      ...prev,
+      [activityKey]: value
+    }));
+  };
+
   const handleRefreshActivity = async (dayIndex: number, activityIndex: number, activity: Activity, e?: React.MouseEvent) => {
     // Prevent the click from triggering the collapse
     e?.stopPropagation();
     
+    const activityKey = `${dayIndex}-${activityIndex}`;
+    
+    // If custom preferences are not shown, show the input field
+    if (!showCustomPreferences[activityKey]) {
+      toggleCustomPreferences(activityKey, e);
+      return;
+    }
+    
     try {
-      setRefreshingActivities(prev => ({ ...prev, [`${dayIndex}-${activityIndex}`]: true }));
-      await onActivityRefresh(dayIndex, activityIndex, activity);
+      setRefreshingActivities(prev => ({ ...prev, [activityKey]: true }));
+      await onActivityRefresh(dayIndex, activityIndex, activity, customPreferences[activityKey]);
+      
+      // Reset and hide the custom preferences input after successful refresh
+      setCustomPreferences(prev => ({
+        ...prev,
+        [activityKey]: ''
+      }));
+      setShowCustomPreferences(prev => ({
+        ...prev,
+        [activityKey]: false
+      }));
     } catch (error) {
       console.error('Error refreshing activity:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to refresh activity');
     } finally {
-      setRefreshingActivities(prev => ({ ...prev, [`${dayIndex}-${activityIndex}`]: false }));
+      setRefreshingActivities(prev => ({ ...prev, [activityKey]: false }));
     }
+  };
+
+  const handleCancelCustomPreferences = (activityKey: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCustomPreferences(prev => ({
+      ...prev,
+      [activityKey]: ''
+    }));
+    setShowCustomPreferences(prev => ({
+      ...prev,
+      [activityKey]: false
+    }));
   };
 
   const handleDeleteActivity = async (dayIndex: number, activityIndex: number, e?: React.MouseEvent) => {
@@ -105,7 +153,26 @@ const Itinerary: React.FC<ItineraryProps> = ({
       const intro = parts[0];
       const options = parts.slice(1).join(':');
       
-      // Try to identify restaurant options
+      // Check if we have a numbered list format
+      if (options.includes('1.') && (options.includes('2.') || options.includes('3.'))) {
+        // Split by number patterns but keep the numbers
+        const listItems = options.split(/(?=\s*\d+\.\s+)/);
+        
+        return (
+          <div>
+            <p>{intro}:</p>
+            <div className="restaurant-options">
+              {listItems.filter(item => item.trim().length > 0).map((item, index) => (
+                <div key={index} className="restaurant-option">
+                  {item.trim()}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      
+      // Try to identify restaurant options with dash separation
       const restaurantRegex = /([\w\s'&-]+)(?:\s*-\s*|\s*–\s*)(.*?)(?=\s*\d+\.|$)/g;
       let formattedOptions = options;
       
@@ -190,6 +257,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
                   const suggestion = altSuggestions[activityKey];
                   const isRefreshing = refreshingActivities[activityKey];
                   const isMeal = activity.type === 'meal' || activity.type === 'food';
+                  const showPreferences = showCustomPreferences[activityKey];
 
                   return (
                     <Card 
@@ -287,15 +355,61 @@ const Itinerary: React.FC<ItineraryProps> = ({
                                   </div>
                                 </div>
                               )}
+                              
+                              {showPreferences && (
+                                <div className="mt-3 custom-preferences-container">
+                                  <Form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleRefreshActivity(dayIndex, activityIndex, activity);
+                                  }}>
+                                    <Form.Group>
+                                      <InputGroup>
+                                        <Form.Control
+                                          type="text"
+                                          placeholder="e.g. something outdoors, kid-friendly"
+                                          value={customPreferences[activityKey] || ''}
+                                          onChange={(e) => handleCustomPreferencesChange(activityKey, e.target.value)}
+                                        />
+                                        <Button 
+                                          type="submit"
+                                          variant="primary" 
+                                          disabled={isRefreshing}
+                                          title="Submit"
+                                          className="d-flex align-items-center justify-content-center"
+                                          style={{ width: '40px', padding: '0' }}
+                                        >
+                                          {isRefreshing ? (
+                                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                          ) : (
+                                            <FaPaperPlane />
+                                          )}
+                                        </Button>
+                                        <Button 
+                                          type="button"
+                                          variant="outline-secondary"
+                                          onClick={(e) => handleCancelCustomPreferences(activityKey, e)}
+                                          title="Cancel"
+                                          className="d-flex align-items-center justify-content-center"
+                                          style={{ width: '40px', padding: '0' }}
+                                        >
+                                          <FaTimes />
+                                        </Button>
+                                      </InputGroup>
+                                    </Form.Group>
+                                  </Form>
+                                </div>
+                              )}
                             </div>
                           </div>
                           {!isReadOnly && isOwner && (
                             <div className="d-flex gap-2">
                               <Button
                                 variant="outline-primary"
-                                className="refresh-button"
+                                className="refresh-button d-flex align-items-center justify-content-center"
                                 onClick={(e) => handleRefreshActivity(dayIndex, activityIndex, activity, e)}
                                 disabled={isRefreshing || isLoading}
+                                title="Refresh Activity"
+                                style={{ width: '36px', height: '36px', padding: '0' }}
                               >
                                 <BsArrowRepeat 
                                   size={20} 
@@ -304,9 +418,11 @@ const Itinerary: React.FC<ItineraryProps> = ({
                               </Button>
                               <Button
                                 variant="outline-danger"
-                                className="delete-button"
+                                className="delete-button d-flex align-items-center justify-content-center"
                                 onClick={(e) => handleDeleteActivity(dayIndex, activityIndex, e)}
                                 disabled={isLoading}
+                                title="Delete Activity"
+                                style={{ width: '36px', height: '36px', padding: '0' }}
                               >
                                 <BsTrash size={16} />
                               </Button>

@@ -120,6 +120,42 @@
 - Removed redundant 'priceLevel' field to simplify the codebase
 - Ensured consistent display of price indicators (Free, $, $$, $$$) across the application
 
+### Custom Activity Preferences Implementation - [Current Date]
+
+- Added custom activity preferences feature for activity refresh
+- Implemented input field that appears when user clicks "Refresh Activity" button
+- Added functionality to submit custom preferences to the backend
+- Updated backend to incorporate user preferences into AI prompt
+- Added styles for the custom preferences container
+- Improved UX with clear submit/cancel buttons
+- Ensured the input field collapses after submission or cancellation
+- Updated RefreshActivityRequest model to include custom_preferences field
+- Enhanced the refresh activity flow to consider user's specific preferences
+- Added responsive styling for mobile devices
+
+### SEO Domain Update - [Current Date]
+
+- Updated all SEO-related files to use the correct domain: https://travelplannerai.org/
+- Modified robots.txt to point to the correct sitemap URL
+- Updated sitemap.xml with the proper domain for all routes
+- Enhanced index.html meta tags with the actual domain (og:url, canonical)
+- Updated the SEO component to use travelplannerai.org as the default domain
+- Improved search engine discoverability by using the actual production domain
+- Note: REACT_APP_SITE_URL environment variable should be updated in deployment
+
+### SEO Optimization - [Current Date]
+
+- Enhanced SEO across the entire application to improve search engine visibility and ranking
+- Created a robots.txt file with specific crawling directives and sitemap reference
+- Generated a sitemap.xml with all main routes and content pages
+- Improved the HTML meta tags in index.html with comprehensive description, keywords, and social media tags
+- Implemented dynamic page titles, descriptions, and meta tags using React Helmet Async
+- Created a reusable SEO component for consistent metadata across all pages
+- Added OpenGraph and Twitter Card meta tags for better social media sharing
+- Added canonical URLs to prevent duplicate content issues
+- Implemented dynamic SEO data based on current page and trip information
+- Applied SEO component to all major pages: Home, Trips, Credits, and FAQ
+
 ### Next Steps
 - Consider adding sorting options for trips (by date, destination, etc.)
 - Add filtering capabilities 

@@ -8,10 +8,5 @@ from .models import (
     TripHash,
     Activity,
     DailyItinerary,
-    TripItinerary,
-    TripRequest
-)
-
-# Re-export the TripHash class for backward compatibility
-class TripHashCompat(TripHash):
-    pass 
+    TripItinerary
+) 

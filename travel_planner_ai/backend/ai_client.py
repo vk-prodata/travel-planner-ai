@@ -10,16 +10,12 @@ import re
 from datetime import datetime, timedelta
 import uuid
 from langdetect import detect
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 import hashlib
 from openai import AsyncOpenAI
 from travel_planner_ai.backend.config.ai_config import AI_CONFIG, get_model_config
 
 load_dotenv()  # Load environment variables from a .env file
-
-# openai.api_key = os.getenv("OPENAI_API_KEY") # Handled by AsyncOpenAI client
-
-# Removed global ai_cache and related standalone functions
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -41,35 +37,58 @@ def ai_model_decorator(model: str = None):
     return decorator
 
 class AIClient:
-    def __init__(self, api_key: str = None, cache_ttl: int = 3600):
+    def __init__(self, api_key: str = None, cache_ttl: int = 3600, provider: str = "openai"):
         """
         Initialize the AI client with caching
         
         Args:
-            api_key: OpenAI API key (defaults to environment variable)
+            api_key: OpenAI or DeepSeek API key (defaults to environment variable)
             cache_ttl: Cache time-to-live in seconds (default: 1 hour)
+            provider: AI provider to use ("openai" or "deepseek")
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OpenAI API key must be provided either directly or via OPENAI_API_KEY environment variable")
+        self.provider = provider.lower()
+        
+        # Set the appropriate API key based on provider
+        if self.provider == "openai":
+            self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+            if not self.api_key:
+                raise ValueError("OpenAI API key must be provided either directly or via OPENAI_API_KEY environment variable")
+            self.base_url = None  # Use default OpenAI base URL
+        elif self.provider == "deepseek":
+            self.api_key = api_key or os.getenv("DS_OPENAI_API_KEY")
+            if not self.api_key:
+                raise ValueError("DeepSeek API key must be provided either directly or via DS_OPENAI_API_KEY environment variable")
+            self.base_url = "https://api.deepseek.com/v1"
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Supported providers are 'openai' and 'deepseek'")
             
-        self.client = AsyncOpenAI(api_key=self.api_key)
-        self.model = AI_CONFIG["default_model"] # Use default from config
+        # Initialize the client
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url
+        )
+        
+        # Set the appropriate model based on provider
+        self.model = self._get_default_model()
         self.cache = TTLCache(maxsize=500, ttl=cache_ttl)
         
+        logger.info(f"AIClient initialized with provider: {self.provider}, model: {self.model}")
+    
+    def _get_default_model(self) -> str:
+        """Get the default model for the selected provider"""
+        if self.provider == "openai":
+            return AI_CONFIG["default_model"]
+        elif self.provider == "deepseek":
+            return AI_CONFIG.get("deepseek_default_model", "deepseek-chat")
+        return AI_CONFIG["default_model"]
+    
     def _generate_cache_key(self, prompt_args: Dict[str, Any]) -> str:
         """Generate a unique cache key from the prompt arguments"""
         # Filter prompt_args to only include keys relevant for caching itinerary generation
-        # Based on the old standalone generate_cache_key, relevant keys were:
-        # "destination", "startDate", "endDate", "travelType", "adults", 
-        # "children", "infants", "budgetLevel", "entertainmentPreferences", 
-        # "intermediateStops", "cuisinePreference"
-        # Assuming trip_request is passed as prompt_args here or a subset of it.
-        
         relevant_keys = [
             "destination", "startDate", "endDate", "travelType", "adults",
             "children", "infants", "budgetLevel", "entertainmentPreferences",
-            "intermediateStops", "cuisinePreference", "language" # Language also affects output
+            "intermediateStops", "cuisinePreference", "language", "aiProvider"  # Added aiProvider to cache key
         ]
         
         key_data = {}
@@ -91,13 +110,44 @@ class AIClient:
             else:
                 key_data[key] = value
         
+        # Include provider in cache key to differentiate between providers
+        key_data["provider"] = self.provider
+        
         # Convert to a stable string representation
         return hashlib.sha256(json.dumps(key_data, sort_keys=True).encode()).hexdigest()
+    
+    def set_provider(self, provider: Literal["openai", "deepseek"]):
+        """Change the AI provider"""
+        if provider not in ["openai", "deepseek"]:
+            raise ValueError(f"Unsupported provider: {provider}. Supported providers are 'openai' and 'deepseek'")
+        
+        # Only reinitialize if the provider is changing
+        if provider != self.provider:
+            logger.info(f"Changing provider from {self.provider} to {provider}")
+            self.provider = provider
+            
+            # Set the appropriate API key based on provider
+            if self.provider == "openai":
+                self.api_key = os.getenv("OPENAI_API_KEY")
+                self.base_url = None  # Use default OpenAI base URL
+            else:  # deepseek
+                self.api_key = os.getenv("DS_OPENAI_API_KEY")
+                self.base_url = "https://api.deepseek.com/v1"
+            
+            # Reinitialize the client
+            self.client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url
+            )
+            
+            # Set the appropriate model based on provider
+            self.model = self._get_default_model()
     
     def _log_api_call(self, prompt_args: Dict[str, Any], is_cached: bool):
         """Log API call details"""
         logger.info(
             f"[AI-CALL] {datetime.now().isoformat()} - "
+            f"Provider: {self.provider}, "
             f"Model: {self.model}, "
             f"Cached: {is_cached}, "
             f"Args: {json.dumps({k: prompt_args.get(k) for k in ['destination', 'startDate', 'endDate', 'language']}, sort_keys=True)[:100]}..."
@@ -122,10 +172,15 @@ class AIClient:
     async def generate_itinerary(self, trip_request: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a travel itinerary based on the provided arguments"""
         try:
+            # Set provider if specified in the request
+            if "aiProvider" in trip_request:
+                self.set_provider(trip_request["aiProvider"])
+                logger.info(f"Using AI provider from request: {self.provider}")
+            
             # Handle deprecated model names
             if self.model == "gpt-4-turbo-8k": # This specific string check
                 logger.warning(f"Model '{self.model}' is deprecated, using '{AI_CONFIG['default_model']}' instead")
-                self.model = AI_CONFIG["default_model"]
+                self.model = self._get_default_model()
                 
             cache_key = self._generate_cache_key(trip_request)
             
@@ -136,7 +191,7 @@ class AIClient:
             self._log_api_call(trip_request, is_cached=False)
             prompt = self._generate_prompt(trip_request)
             
-            logger.info(f"Sending request to OpenAI with model {self.model}")
+            logger.info(f"Sending request to {self.provider.upper()} with model {self.model}")
             logger.debug(f"Prompt structure: { {key: type(val) for key, val in json.loads(prompt).items()} if isinstance(prompt,str) and prompt.startswith('{') else 'String prompt' }")
 
             try:
@@ -164,14 +219,14 @@ class AIClient:
                 )
                 
                 if not response or not response.choices or not response.choices[0].message:
-                    raise ValueError("Invalid response structure from OpenAI API")
+                    raise ValueError("Invalid response structure from API")
                     
-                logger.info("Received response from OpenAI")
+                logger.info(f"Received response from {self.provider.upper()}")
                 # logger.debug(f"Raw response: {response}") # Can be very verbose
                 
                 content = response.choices[0].message.content
                 if not content:
-                    raise ValueError("Empty content in response from OpenAI API")
+                    raise ValueError(f"Empty content in response from {self.provider.upper()} API")
                     
                 itinerary = await self._process_response(content, trip_request)
                 self.cache[cache_key] = itinerary
@@ -179,17 +234,17 @@ class AIClient:
                 return itinerary
                 
             except openai.APIError as api_error:
-                logger.error(f"OpenAI API error during completions.create: {str(api_error)}")
-                raise ValueError(f"OpenAI API error: {str(api_error)}") 
+                logger.error(f"{self.provider.upper()} API error during completions.create: {str(api_error)}")
+                raise ValueError(f"{self.provider.upper()} API error: {str(api_error)}") 
             except Exception as e_api_call:
-                logger.error(f"Unexpected error during OpenAI API call: {str(e_api_call)}", exc_info=True)
+                logger.error(f"Unexpected error during {self.provider.upper()} API call: {str(e_api_call)}", exc_info=True)
                 raise ValueError(f"Unexpected error during API call: {str(e_api_call)}")
             
         except ValueError as ve:
             logger.error(f"ValueError in generate_itinerary: {str(ve)}", exc_info=True)
             return self._create_fallback_itinerary(trip_request)
         except Exception as e:
-            logger.error(f"Error generating itinerary with model {self.model}: {str(e)}", exc_info=True) 
+            logger.error(f"Error generating itinerary with {self.provider} model {self.model}: {str(e)}", exc_info=True) 
             return self._create_fallback_itinerary(trip_request)
 
     def _generate_prompt(self, args: Dict[str, Any]) -> str:

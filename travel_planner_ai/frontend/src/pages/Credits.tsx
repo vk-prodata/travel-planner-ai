@@ -6,10 +6,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { getUserCredits, CREDIT_PACKAGES } from '../services/creditsService';
 import { notifyError } from '../services/errorService';
 import LoggingToggle from '../components/LoggingToggle';
+import SEO from '../components/SEO';
 import '../styles/Credits.css';
 
 const Credits: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUserCredits } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
@@ -91,6 +92,11 @@ const Credits: React.FC = () => {
   if (!user) {
     return (
       <>
+        <SEO 
+          title="Credits - Travel Planner AI"
+          description="Manage your Travel Planner AI credits. View your balance, purchase history, and add more credits."
+          url="/credits"
+        />
         <Navbar bg="light" expand="lg" className="px-3 shadow-sm">
           <Navbar.Brand onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
             <FaPlane className="me-2" />
@@ -114,6 +120,11 @@ const Credits: React.FC = () => {
   
   return (
     <>
+      <SEO 
+        title="Credits - Travel Planner AI"
+        description="Manage your Travel Planner AI credits. View your balance, purchase history, and add more credits."
+        url="/credits"
+      />
       <Navbar bg="light" expand="lg" className="px-3 shadow-sm">
         <Navbar.Brand onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <FaPlane className="me-2" />
