@@ -163,8 +163,15 @@ const MainApp = () => {
 
   const handleSubmit = async (data: TripFormData) => {
     setIsLoading(true);
+    // Reset all existing trip data to ensure UI is refreshed
+    setItinerary(null);
+    setLocalItinerary(null);
     setFormData(data);
     setCurrentTripId(null);
+    // Clear any URL parameters
+    setSearchParams({});
+    // Clear any cached itinerary in localStorage
+    localStorage.removeItem('unsavedItinerary');
 
     try {
       if (!user) {
@@ -509,6 +516,13 @@ const MainApp = () => {
 
   // Add useEffect to restore unsaved changes from localStorage
   useEffect(() => {
+    // If we've explicitly set both state values to null, don't restore from localStorage
+    // This case happens when we're creating a new trip
+    if (itinerary === null && localItinerary === null) {
+      console.log('Skipping localStorage restoration as we are creating a new trip');
+      return;
+    }
+    
     const unsavedItinerary = localStorage.getItem('unsavedItinerary');
     if (unsavedItinerary) {
       try {
@@ -664,7 +678,6 @@ const MainApp = () => {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleGenerateItinerary = async () => {
     if (isReadOnlyMode) {
       return;
@@ -676,10 +689,15 @@ const MainApp = () => {
       }
 
       setIsLoading(true);
+      // Completely reset state
       setItinerary(null);
+      setLocalItinerary(null);
       
       // Clear any cached search params to avoid confusion
       setSearchParams({});
+      
+      // Clear any cached itinerary in localStorage
+      localStorage.removeItem('unsavedItinerary');
       
       const generatedItinerary = await generateItinerary(formData, user?.id || 'anonymous');
       

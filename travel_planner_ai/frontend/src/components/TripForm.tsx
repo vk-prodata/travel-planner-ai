@@ -106,6 +106,10 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
     }
     
     setDateError(null);
+    
+    // Clear any cached trip data to ensure a fresh start
+    localStorage.removeItem('unsavedItinerary');
+    
     onSubmit(formData);
   };
 
