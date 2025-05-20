@@ -175,6 +175,28 @@ const FaqPage = () => {
           <p>Buying larger credit packages often comes with a discount per credit.</p>
         </FaqItem>
 
+        <FaqItem question="How can I get the best results from the Travel Planner AI?">
+          <p>To make the most out of our AI-powered travel planner, consider the following tips:</p>
+          <ul>
+            <li><strong>Be Specific with Interests:</strong> The more details you provide about your interests (including "Advanced Settings" like cousine, bugget, etc.), the better the AI can tailor the itinerary to your preferences."</li>
+            <li><strong>Provide Clear Travel Dates:</strong> Accurate start and end dates help the AI plan a realistic schedule, considering travel times and opening hours of attractions.</li>
+            <li><strong>Choose Your Entertainment Preferences:</strong> Are you looking for a outdoor family-friendly activity with visitin must see place. Be sure that you've chosen: Outdoor, Family-friendly and Must see.</li>
+            <li><strong>List "Must-See" Attractions:</strong> If there are specific places you definitely want to visit, list them. The AI will try to incorporate these into your plan.</li>
+          </ul>
+        </FaqItem>
+
+        <FaqItem question="How can I view and manage my saved trips?">
+          <p>You can see all your created trips by clicking on the "My Trips" button in the header. From there, you'll be able to view the details of each trip or delete any trips you no longer need.</p>
+        </FaqItem>
+
+        <FaqItem question="How are credits deducted when I create a travel plan?">
+          <p>Credits are used to generate your personalized itineraries. Typically, <strong>1 credit is used for each full day</strong> of your travel plan. For example, a 7-day trip will usually require 7 credits. New users also receive 10 free credits to get started!</p>
+        </FaqItem>
+
+        <FaqItem question="What if I want to change a specific activity in my generated plan?">
+          <p>If an activity in your generated itinerary isn't quite right, you can use the "Refresh Activity" feature. This allows the AI to suggest an alternative for that specific part of your day. You can even provide custom preferences (e.g., "something less crowded" or "an outdoor option") when refreshing to get a more tailored suggestion. Note: it doesn't cost any credits to refresh an activity.</p>
+        </FaqItem>
+
       </Container>
     </Container>
   );

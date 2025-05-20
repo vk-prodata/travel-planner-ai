@@ -203,6 +203,8 @@
 - Changed FAQ and Credits button/badge colors to blue variants.
 - Changed FAQ and Credits button/badge colors to match 'My Trips' button style (`outline-primary` and `bg="primary"`).
 - Moved 'Contact Us' button to `FaqPage` header, integrated form logic into `FaqPage`, removed `ContactForm` component.
+- Added a new FAQ item to `FaqPage.js` explaining how to get the best results from the Travel Planner AI.
+- Added three more FAQ items to `FaqPage.js` covering trip management, credit deduction, and itinerary customization.
 
 # Decisions
 
