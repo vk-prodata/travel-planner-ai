@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from datetime import date, datetime
+from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
+from datetime import date, datetime, timedelta
 from enum import Enum
 import hashlib
 import uuid
@@ -55,7 +55,42 @@ class TripCreate(BaseModel):
         for field in required_fields:
             if field not in v or not v[field]:
                 raise ValueError(f"Missing required field: {field}")
+        # Also ensure dates are in correct format
+        try:
+            if 'startDate' in v and v['startDate']:
+                date.fromisoformat(v['startDate'])
+            if 'endDate' in v and v['endDate']:
+                date.fromisoformat(v['endDate'])
+        except ValueError:
+            raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
         return v
+
+    @model_validator(mode='after')
+    def check_trip_duration(self) -> 'TripCreate':
+        form_data = self.formData
+        if form_data and 'startDate' in form_data and 'endDate' in form_data:
+            try:
+                start_date_str = form_data['startDate']
+                end_date_str = form_data['endDate']
+
+                if not start_date_str or not end_date_str: # Skip if either is empty, covered by field_validator
+                    return self
+
+                start_date = date.fromisoformat(start_date_str)
+                end_date = date.fromisoformat(end_date_str)
+
+                if start_date > end_date:
+                    raise ValueError("End date cannot be earlier than start date.")
+
+                if (end_date - start_date).days > 10:
+                    raise ValueError("Trip duration cannot exceed 10 days.")
+            except ValueError as e: # Catch specific ValueError for date parsing or our custom messages
+                raise ValueError(str(e)) # Re-raise to be caught by FastAPI
+            except Exception as e: # Catch any other unexpected errors during date processing
+                # Log this error for debugging, as it's unexpected
+                print(f"Unexpected error during date validation: {e}") # Or use a proper logger
+                raise ValueError("An unexpected error occurred while validating trip dates.")
+        return self
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -69,6 +104,33 @@ class TripUpdate(BaseModel):
     userId: Optional[str] = None
     formData: Optional[Dict[str, Any]] = None
     itinerary: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode='after')
+    def check_trip_duration_update(self) -> 'TripUpdate':
+        form_data = self.formData
+        if form_data and 'startDate' in form_data and 'endDate' in form_data:
+            # This validator relies on both dates being present.
+            # If only one is provided during an update, this check might not be appropriate
+            # or needs to be adjusted based on how partial updates are handled.
+            # For now, we assume if formData is present, both dates relevant for duration check are also present if being changed.
+            start_date_str = form_data.get('startDate')
+            end_date_str = form_data.get('endDate')
+
+            if start_date_str and end_date_str: # Only proceed if both dates are provided in the update
+                try:
+                    start_date = date.fromisoformat(start_date_str)
+                    end_date = date.fromisoformat(end_date_str)
+
+                    if start_date > end_date:
+                        raise ValueError("End date cannot be earlier than start date.")
+                    if (end_date - start_date).days > 10:
+                        raise ValueError("Trip duration cannot exceed 10 days.")
+                except ValueError as e: # Catch specific ValueError for date parsing or our custom messages
+                    raise ValueError(str(e)) # Re-raise to be caught by FastAPI
+                except Exception as e: # Catch any other unexpected errors
+                    print(f"Unexpected error during date validation on update: {e}") # Or use a proper logger
+                    raise ValueError("An unexpected error occurred while validating trip dates on update.")
+        return self
 
     model_config = ConfigDict(
         json_schema_extra = {

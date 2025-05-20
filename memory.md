@@ -221,3 +221,35 @@
 - Implement backend endpoint for contact form email submission.
 - Connect frontend form to backend endpoint.
 - Run tests. 
+
+## Session Summary - YYYY-MM-DD
+
+**Goal:** Limit trip duration to a maximum of 10 days, add validation, and notify the user.
+
+**Progress:**
+1.  **Backend Validation:**
+    *   Modified `travel_planner_ai/backend/models/trip.py`.
+    *   Added a `model_validator` to `TripCreate` and `TripUpdate` Pydantic models.
+    *   The validator ensures that `endDate` is not more than 10 days after `startDate` and that `startDate` is not after `endDate`.
+    *   Raises a `ValueError` if validation fails, leading to a 422 HTTP response from FastAPI.
+2.  **Backend Integration Tests:**
+    *   Updated `travel_planner_ai/backend/tests/test_trips_api.py`.
+    *   Added new test cases:
+        *   `test_create_trip_duration_too_long()`: Checks for 422 error if duration > 10 days.
+        *   `test_create_trip_duration_valid_max()`: Checks for success if duration = 10 days.
+        *   `test_create_trip_end_date_before_start_date()`: Checks for 422 error if end date is before start date.
+    *   Adjusted database mocks for more accurate testing of the creation endpoint.
+3.  **Frontend Validation & Notification:**
+    *   Modified `travel_planner_ai/frontend/src/components/TripForm.tsx`.
+    *   Added a `validateDates(startDate, endDate)` function to check duration (max 10 days) and date order.
+    *   This function is called in `onChange` handlers for both start and end date inputs, and in `handleSubmit`.
+    *   The `dateError` state is updated, and `Form.Control.Feedback` displays the error message below the date inputs.
+
+**Decisions Made:**
+*   Implemented validation on both backend (Pydantic models) and frontend (React component state and handlers).
+*   Backend raises `ValueError` for Pydantic to convert to 422 errors.
+*   Frontend provides immediate feedback on date input changes and on form submission attempt.
+*   Ensured integration tests cover the new backend validation logic.
+
+**Next Steps:**
+*   (If any further work related to this feature is planned) 

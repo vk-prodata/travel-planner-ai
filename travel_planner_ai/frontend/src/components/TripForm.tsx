@@ -37,6 +37,38 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
   const [dateError, setDateError] = useState<string | null>(null);
   const [stopError, setStopError] = useState<string | null>(null);
 
+  const validateDates = (start: string, end: string): string | null => {
+    if (!start || !end) return null; // Not enough info to validate yet
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    if (endDate < startDate) {
+      return 'End date must be after start date.';
+    }
+
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // The problem asks for max 10 days. If start is 1st and end is 10th, it's 10 days. (10 - 1) = 9.
+    // If start is 1st and end is 11th, it's 11 days. (11 - 1) = 10.
+    // So, (endDate - startDate).days should not be > 9 if we count inclusively.
+    // Or, if we consider the number of nights, it's simpler.
+    // A 1-day trip: start=1st, end=1st. diffDays = 0. Duration = 1 day.
+    // A 10-day trip: start=1st, end=10th. diffDays = 9. Duration = 10 days.
+    // An 11-day trip: start=1st, end=11th. diffDays = 10. Duration = 11 days.
+    // So, diffDays (difference in days) should be <= 9 for a 10-day trip.
+    // If diffDays is 10, it means 11 days.
+
+    const durationInDays = diffDays + 1; // Calculate inclusive days
+
+    if (durationInDays > 10) {
+      return 'Trip duration cannot exceed 10 days.';
+    }
+
+    return null;
+  };
+
   const addIntermediateStop = () => {
     if (!newStop.destination) {
       setStopError('Please enter a destination');
@@ -96,16 +128,12 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate dates before submitting
-    const start = new Date(formData.startDate);
-    const end = new Date(formData.endDate);
-    
-    if (end < start) {
-      setDateError('End date must be after start date');
+    const currentError = validateDates(formData.startDate, formData.endDate);
+    if (currentError) {
+      setDateError(currentError);
       return;
     }
-    
-    setDateError(null);
+    setDateError(null); // Clear error if validation passes
     
     // Clear any cached trip data to ensure a fresh start
     localStorage.removeItem('unsavedItinerary');
@@ -182,29 +210,25 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
               value={formData.startDate}
               onChange={(e) => {
                 const newStartDate = e.target.value;
+                let newEndDate = formData.endDate;
                 
-                // If end date is empty, set default end date to start date + 7 days
-                if (!formData.endDate) {
+                // If end date is empty, or if new start date makes end date invalid, adjust end date.
+                if (!newEndDate || new Date(newEndDate) < new Date(newStartDate)) {
                   const defaultEndDate = new Date(newStartDate);
-                  defaultEndDate.setDate(defaultEndDate.getDate() + 7);
-                  
-                  // Format the date as YYYY-MM-DD for the input
-                  const formattedEndDate = defaultEndDate.toISOString().split('T')[0];
-                  
-                  setFormData({...formData, startDate: newStartDate, endDate: formattedEndDate});
-                  setDateError(null);
+                  defaultEndDate.setDate(defaultEndDate.getDate() + 7); // Default to 7 days, can be adjusted by user
+                  newEndDate = defaultEndDate.toISOString().split('T')[0];
                 }
-                // If end date exists and is now before start date, update end date
-                else if (new Date(formData.endDate) < new Date(newStartDate)) {
-                  setFormData({...formData, startDate: newStartDate, endDate: newStartDate});
-                  setDateError(null);
-                } else {
-                  setFormData({...formData, startDate: newStartDate});
-                  setDateError(null);
-                }
+                
+                const currentError = validateDates(newStartDate, newEndDate);
+                setDateError(currentError);
+                setFormData({...formData, startDate: newStartDate, endDate: newEndDate });
               }}
               required
+              isInvalid={!!dateError && formData.startDate !== ''} // Show error if start date contributes
             />
+            <Form.Control.Feedback type="invalid">
+              {dateError}
+            </Form.Control.Feedback>
           </Form.Group>
         </Col>
         <Col md={6}>
@@ -216,14 +240,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
               min={formData.startDate} // Prevent selecting dates before start date
               onChange={(e) => {
                 const newEndDate = e.target.value;
+                const currentError = validateDates(formData.startDate, newEndDate);
+                setDateError(currentError);
                 setFormData({...formData, endDate: newEndDate});
-                
-                // Validate end date is after start date
-                if (formData.startDate && new Date(newEndDate) < new Date(formData.startDate)) {
-                  setDateError('End date must be after start date');
-                } else {
-                  setDateError(null);
-                }
               }}
               required
               isInvalid={!!dateError}
