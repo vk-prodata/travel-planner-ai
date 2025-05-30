@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Form, Button, Row, Col, OverlayTrigger, Tooltip, Accordion, Badge } from 'react-bootstrap';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType, AIProvider } from '../types';
+import LocationInput from './LocationInput';
 
 interface TripFormProps {
   onSubmit: (data: TripFormData) => void;
@@ -175,28 +176,26 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
       {/* Departure & Destination */}
       <Row className="mb-4">
         <Col md={6}>
-          <Form.Group>
-            <Form.Label className="text-secondary fw-bold">From</Form.Label>
-            <Form.Control
-              className="shadow-sm"
-              type="text"
-              value={formData.origin}
-              onChange={(e) => setFormData({...formData, origin: e.target.value})}
-              required
-            />
-          </Form.Group>
+          <LocationInput
+            label="From"
+            value={formData.origin || ''}
+            onChange={(value) => setFormData({...formData, origin: value})}
+            placeholder="Enter your starting location"
+            showGeolocation={true}
+            showAutocomplete={true}
+            required={true}
+          />
         </Col>
         <Col md={6}>
-          <Form.Group>
-            <Form.Label className="text-secondary fw-bold">To</Form.Label>
-            <Form.Control
-              className="shadow-sm"
-              type="text"
-              value={formData.destination}
-              onChange={(e) => setFormData({...formData, destination: e.target.value})}
-              required
-            />
-          </Form.Group>
+          <LocationInput
+            label="To"
+            value={formData.destination}
+            onChange={(value) => setFormData({...formData, destination: value})}
+            placeholder="Enter your destination"
+            showGeolocation={false}
+            showAutocomplete={true}
+            required={true}
+          />
         </Col>
       </Row>
 
@@ -363,12 +362,14 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
                 </OverlayTrigger>
               </Form.Label>
               <div className="d-flex gap-2 mb-2">
-                <Form.Control
-                  type="text"
+                <LocationInput
+                  label=""
                   value={newStop.destination}
-                  onChange={(e) => setNewStop({ ...newStop, destination: e.target.value })}
+                  onChange={(value) => setNewStop({ ...newStop, destination: value })}
                   placeholder="City/Location"
-                  className="flex-grow-1 shadow-sm"
+                  showGeolocation={false}
+                  showAutocomplete={true}
+                  className="flex-grow-1"
                 />
                 <div className="d-flex flex-column" style={{ width: '140px' }}>
                   <Form.Control

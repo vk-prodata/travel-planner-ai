@@ -6,7 +6,7 @@ import Itinerary from './components/Itinerary';
 import TripTitleExport from './components/TripTitleExport';
 import { TripFormData, TripItinerary, Activity } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShare, FaShareAlt, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
+import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShareAlt, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
 import { saveTrip, updateTrip, getTripById } from './services/tripService';
@@ -675,52 +675,6 @@ const MainApp = () => {
       notifyError('Failed to save title', user?.email);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleGenerateItinerary = async () => {
-    if (isReadOnlyMode) {
-      return;
-    }
-
-    try {
-      if (!formData) {
-        return;
-      }
-
-      setIsLoading(true);
-      // Completely reset state
-      setItinerary(null);
-      setLocalItinerary(null);
-      
-      // Clear any cached search params to avoid confusion
-      setSearchParams({});
-      
-      // Clear any cached itinerary in localStorage
-      localStorage.removeItem('unsavedItinerary');
-      
-      const generatedItinerary = await generateItinerary(formData, user?.id || 'anonymous');
-      
-      // Ensure the isOwner flag is set for new itineraries
-      const itineraryWithOwnership = {
-        ...generatedItinerary,
-        isOwner: true // User is always the owner of a newly generated itinerary
-      };
-      
-      setItinerary(itineraryWithOwnership);
-      setLocalItinerary(itineraryWithOwnership);
-      setHasUnsavedChanges(true);
-      
-      // Reset any existing trip ID since this is a new itinerary
-      setCurrentTripId(null);
-      
-      notifySuccess('Itinerary generated successfully!');
-      
-    } catch (error) {
-      console.error('Failed to generate itinerary:', error);
-      notifyError(error instanceof Error ? error.message : 'Failed to generate itinerary', user?.email);
-    } finally {
-      setIsLoading(false);
     }
   };
 

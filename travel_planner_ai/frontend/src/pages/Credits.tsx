@@ -10,7 +10,7 @@ import SEO from '../components/SEO';
 import '../styles/Credits.css';
 
 const Credits: React.FC = () => {
-  const { user, refreshUserCredits } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
@@ -57,7 +57,7 @@ const Credits: React.FC = () => {
     } else {
       setLoading(false);
     }
-  }, [user, location.search, navigate]);
+  }, [user, location.search, location.pathname, navigate]);
   
   const handleStripeRedirect = (packageId: string) => {
     if (!user) {
