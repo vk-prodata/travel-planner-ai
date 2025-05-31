@@ -22,6 +22,7 @@ import './styles/App.css';
 import FaqPage from './pages/FaqPage/FaqPage';
 import ical from 'ical-generator';
 import SEO from './components/SEO';
+import TripLoadingHints from './components/TripLoadingHints';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
@@ -777,10 +778,11 @@ const MainApp = () => {
             <div className="p-4">
               {isLoading ? (
                 <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
+                  <div className="spinner-border text-primary mb-4" role="status" style={{ width: '3rem', height: '3rem' }}>
                     <span className="visually-hidden">Loading...</span>
                   </div>
-                  <p className="mt-2 text-primary-dark">Generating your perfect trip...</p>
+                  <h4 className="text-primary-dark mb-4">Generating your perfect trip...</h4>
+                  <TripLoadingHints className="mt-4" />
                 </div>
               ) : itinerary ? (
                 <div>
@@ -808,7 +810,7 @@ const MainApp = () => {
                     ) : (
                       <div className="d-flex align-items-center gap-2 flex-wrap">
                         <div className="d-flex align-items-center gap-2">
-                          <h3 className="text-primary-dark m-0">
+                          <h3 className="text-primary-dark m-0 fs-5">
                             {getTripTitle()}
                           </h3>
                           <div className="d-flex gap-2 align-items-center">

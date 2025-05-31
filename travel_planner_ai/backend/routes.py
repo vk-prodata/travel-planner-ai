@@ -333,8 +333,9 @@ async def generate_itinerary(
                         activity['description'] = "No content generated"
                     if not activity.get('type'):
                         activity['type'] = "activity"
-                    if not activity.get('id'):
-                        activity['id'] = f"{day['date']}-{id(activity)}"
+                    # TODO: Deprecated Activity ID June 2025 - activity ID fallback generation no longer needed
+                    # if not activity.get('id'):
+                    #     activity['id'] = f"{day['date']}-{id(activity)}"
 
             logger.info(f"Successfully formatted itinerary for {current_user.get('email')} using {ai_provider} provider")
             logger.debug(f"Final formatted itinerary: {json.dumps(itinerary, indent=2)}")
@@ -422,7 +423,6 @@ async def refresh_activity(
         Why: Explanation of why this activity is recommended
         Price: free|$|$$|$$$
         Location: Specific place name
-        Coordinates: latitude,longitude (if available)
         [ACTIVITY_END]
 
         Rules:
@@ -431,9 +431,12 @@ async def refresh_activity(
         3. Make it family-friendly and engaging
         4. Include specific details and locations
         5. For the Location field, provide the exact name of the place (restaurant, museum, park, etc.)
-        6. For the Coordinates field, provide the latitude and longitude if available, otherwise leave it blank
         """
         
+        # TODO: Deprecated Coordinates June 2025 - coordinates no longer requested in refresh activity prompt
+        # Old code: 6. For the Coordinates field, provide the latitude and longitude if available, otherwise leave it blank
+        # Old code: Coordinates: latitude,longitude (if available)
+
         # Add user custom preferences if provided
         if request.custom_preferences:
             prompt += f"""
@@ -479,7 +482,8 @@ async def refresh_activity(
             # Parse the new activity
             lines = [line.strip() for line in content.split('\n') if line.strip()]
             new_activity = {
-                'id': request.activity.get('id'),
+                # TODO: Deprecated Activity ID June 2025 - activity ID no longer copied or generated in refresh
+                # 'id': request.activity.get('id'),
                 'time': request.activity.get('time'),
                 'type': activity_type
             }
@@ -493,10 +497,11 @@ async def refresh_activity(
                     new_activity['description'] = line.replace('Description: ', '').strip()
                 elif line.startswith('Location: '):
                     new_activity['location'] = line.replace('Location: ', '').strip()
-                elif line.startswith('Coordinates: '):
-                    coordinates = line.replace('Coordinates: ', '').strip()
-                    if coordinates and coordinates != '(latitude,longitude if available)':
-                        new_activity['coordinates'] = coordinates
+                # TODO: Deprecated Coordinates June 2025 - coordinate parsing no longer performed in refresh activity
+                # elif line.startswith('Coordinates: '):
+                #     coordinates = line.replace('Coordinates: ', '').strip()
+                #     if coordinates and coordinates != '(latitude,longitude if available)':
+                #         new_activity['coordinates'] = coordinates
                 elif line.startswith('Price: '):
                     price = line.replace('Price: ', '').strip()
                     # Only store price

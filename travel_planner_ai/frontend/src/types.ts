@@ -21,12 +21,15 @@ export type AIProvider = 'openai' | 'deepseek';
 
 // Trip related types
 export interface Activity {
-  id: string;
+  id?: string; // TODO: Deprecated Activity ID June 2025 - no longer generated or used
   time: string;
   description: string;
   type: string;
   location?: string;
-  coordinates?: string;
+  coordinates?: { // TODO: Deprecated Coordinates June 2025 - no longer generated or used for maps
+    latitude: number;
+    longitude: number;
+  } | string; // Support both object format and string format for backward compatibility
   price?: PriceLevel;
   why?: string;
 }
@@ -56,7 +59,25 @@ export type TravelType = 'flight' | 'train' | 'road' | 'bus' | 'cruise';
 
 export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food' | 'adventure' | 'educational' | 'nightlife' | 'must-see';
 
-export type CuisineType = 'any' | 'local' | 'international' | 'vegetarian' | 'halal' | 'kosher';
+export type CuisineType = 
+  | 'any' 
+  | 'local' 
+  | 'international' 
+  | 'vegetarian' 
+  | 'vegan' 
+  | 'halal' 
+  | 'kosher' 
+  | 'seafood' 
+  | 'mediterranean' 
+  | 'asian' 
+  | 'european' 
+  | 'american' 
+  | 'mexican' 
+  | 'japanese' 
+  | 'italian' 
+  | 'slavic' 
+  | 'indian' 
+  | 'thai';
 
 export interface TripFormData {
   travelType: TravelType;

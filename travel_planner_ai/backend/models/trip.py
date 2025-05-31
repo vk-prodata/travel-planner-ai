@@ -11,12 +11,12 @@ class BudgetLevel(str, Enum):
     luxury = "luxury"
 
 class Activity(BaseModel):
-    id: str
+    id: Optional[str] = None  # TODO: Deprecated Activity ID June 2025 - no longer generated or used
     time: str
     description: str
     type: str
     location: Optional[str] = None
-    coordinates: Optional[str] = None
+    coordinates: Optional[str] = None  # TODO: Deprecated Coordinates June 2025 - no longer generated or used for maps
     priceLevel: Optional[str] = None
     why: Optional[str] = None
 

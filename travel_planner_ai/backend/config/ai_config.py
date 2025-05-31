@@ -50,7 +50,7 @@ AI_CONFIG = {
         "gpt-4o-2024-11-20": {
             "temperature": 0.3,    # Low temperature for consistency and correctness in format (reduces hallucinations while keeping some creativity).
             "top_p": 1.0,          # Use full token distribution; primary randomness control via temperature.
-            "max_tokens": 8000,    # Allow up to ~6000 tokens in the response (covers detailed itineraries up to 10 days).
+            "max_tokens": 14000,   # Reduced from 16000 to leave more room for output tokens - improves completion for longer itineraries.
             "frequency_penalty": 0.0,  # No repetition penalty (itineraries may naturally repeat structure like days of week).
             "presence_penalty": 0.0,   # No presence penalty (avoid forcing new/unrelated content; focus on relevant activities).
         },
@@ -58,14 +58,14 @@ AI_CONFIG = {
         "deepseek-chat": {
             "temperature": 0.4,    # Slightly higher than OpenAI for creativity while maintaining coherence
             "top_p": 0.95,         # Slightly reduced nucleus sampling to maintain focus
-            "max_tokens": 6000,    # Similar to OpenAI to handle detailed itineraries
+            "max_tokens": 8000,    # Increased from 6000 to handle longer itineraries
             "frequency_penalty": 0.1,  # Small penalty to reduce repetition
             "presence_penalty": 0.1,   # Small penalty to encourage diverse content
         },
         "deepseek-coder": {  # Alternative model with more structured output
             "temperature": 0.3,    # Lower temperature for more consistent formatting
             "top_p": 0.9,          # Further reduced for consistency
-            "max_tokens": 6000,    # Same token limit
+            "max_tokens": 8000,    # Increased from 6000 to handle longer itineraries
             "frequency_penalty": 0.2,  # Higher penalty to avoid repetitive suggestions
             "presence_penalty": 0.0,   # No presence penalty to maintain focus
         }

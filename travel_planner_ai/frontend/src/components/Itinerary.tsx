@@ -126,23 +126,30 @@ const Itinerary: React.FC<ItineraryProps> = ({
   };
 
   // Function to get Google Maps URL from coordinates
-  const getGoogleMapsUrl = (coordinates: string, location?: string) => {
-    if (!coordinates) return '#';
+  const getGoogleMapsUrl = (coordinates: any, location?: string) => {
+    // PRIORITIZE location name search for better accuracy
+    if (location && location.trim() !== '' && location !== 'Location not specified') {
+      // Use exact venue name - much more accurate than AI-generated coordinates
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+    }
     
-    // If location is available, use it for a more accurate search
-    const locationString = location || '';
-    const [placeName, city, state, country] = locationString.split(',').map((part: string) => part.trim());
+    // TODO: Deprecated Coordinates June 2025 - coordinate-based map links no longer used
+    // FALLBACK: Use coordinate object format only if no location name available
+    // if (coordinates && typeof coordinates === 'object' && coordinates.latitude && coordinates.longitude) {
+    //   const lat = coordinates.latitude;
+    //   const lon = coordinates.longitude;
+    //   return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+    // }
+    // 
+    // // FALLBACK: Handle string coordinate format
+    // if (coordinates && typeof coordinates === 'string') {
+    //   const coordMatch = coordinates.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+    //   if (coordMatch) {
+    //     return `https://www.google.com/maps/search/?api=1&query=${coordinates}`;
+    //   }
+    // }
     
-    // Build the search query with available location details
-    let searchQuery = '';
-    if (placeName) searchQuery += placeName;
-    if (city) searchQuery += (searchQuery ? ', ' : '') + city;
-    if (state) searchQuery += (searchQuery ? ', ' : '') + state;
-    if (country) searchQuery += (searchQuery ? ', ' : '') + country;
-    
-    // If we have a formatted location, use it; otherwise, fall back to coordinates
-    const query = searchQuery || coordinates;
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    return '#';
   };
 
   // Function to format meal descriptions to highlight restaurant options
@@ -261,7 +268,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
 
                   return (
                     <Card 
-                      key={activity.id} 
+                      key={`${dayIndex}-${activityIndex}`} 
                       className="mb-2 shadow-sm"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -297,7 +304,8 @@ const Itinerary: React.FC<ItineraryProps> = ({
                                     {activity.location}
                                   </span>
                                   
-                                  {activity.coordinates && (
+                                  {/* TODO: Deprecated Coordinates June 2025 - coordinate-based map links no longer generated */}
+                                  {/* {activity.coordinates && (
                                     <a 
                                       href={getGoogleMapsUrl(activity.coordinates, activity.location)} 
                                       target="_blank" 
@@ -307,7 +315,17 @@ const Itinerary: React.FC<ItineraryProps> = ({
                                     >
                                       View on Map
                                     </a>
-                                  )}
+                                  )} */}
+                                  
+                                  <a 
+                                    href={getGoogleMapsUrl(null, activity.location)} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="ms-2 text-primary"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    View on Map
+                                  </a>
                                 </div>
                               )}
                               

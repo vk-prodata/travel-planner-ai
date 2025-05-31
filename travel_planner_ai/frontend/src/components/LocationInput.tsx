@@ -36,7 +36,6 @@ const LocationInput: React.FC<LocationInputProps> = ({
   const [isLoadingGeo, setIsLoadingGeo] = useState(false);
   const [isLoadingAutocomplete, setIsLoadingAutocomplete] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
-  const [autocompleteEnabled, setAutocompleteEnabled] = useState(showAutocomplete);
   
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -133,7 +132,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const searchPlaces = async (query: string) => {
-    if (!autocompleteEnabled || query.length < 2) {
+    if (!showAutocomplete || query.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -193,29 +192,10 @@ const LocationInput: React.FC<LocationInputProps> = ({
     setSuggestions([]);
   };
 
-  const toggleAutocomplete = () => {
-    const newState = !autocompleteEnabled;
-    setAutocompleteEnabled(newState);
-    if (!newState) {
-      setShowSuggestions(false);
-      setSuggestions([]);
-    }
-  };
-
   return (
     <Form.Group className={className}>
       <div className="d-flex align-items-center justify-content-between mb-1">
         <Form.Label htmlFor={inputId} className="text-secondary fw-bold mb-0">{label}</Form.Label>
-        {showAutocomplete && (
-          <Form.Check
-            type="switch"
-            id={`autocomplete-${label.toLowerCase()}`}
-            label="Auto-complete"
-            checked={autocompleteEnabled}
-            onChange={toggleAutocomplete}
-            className="ms-2"
-          />
-        )}
       </div>
       
       <div style={{ position: 'relative' }}>
@@ -230,7 +210,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
             required={required}
             className="shadow-sm"
             onFocus={() => {
-              if (autocompleteEnabled && suggestions.length > 0) {
+              if (showAutocomplete && suggestions.length > 0) {
                 setShowSuggestions(true);
               }
             }}
@@ -253,7 +233,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
             </Button>
           )}
           
-          {showAutocomplete && autocompleteEnabled && value && (
+          {showAutocomplete && value && (
             <Button
               variant="outline-secondary"
               onClick={() => {
@@ -272,7 +252,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
         </InputGroup>
 
         {/* Autocomplete Dropdown */}
-        {showSuggestions && autocompleteEnabled && (
+        {showSuggestions && showAutocomplete && (
           <div
             ref={dropdownRef}
             className="position-absolute w-100 bg-white border rounded shadow-lg"
