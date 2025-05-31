@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Card, Button, Alert, Form, InputGroup } from 'react-bootstrap';
-import { TripItinerary, Activity } from '../types';
-import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt, BsChevronUp, BsChevronDown } from 'react-icons/bs';
+import { Card, Button, Alert, Form, InputGroup, Collapse } from 'react-bootstrap';
+import { TripItinerary, Activity, TripFormData } from '../types';
+import { BsArrowRepeat, BsCheck, BsX, BsTrash, BsGeoAlt, BsChevronUp, BsChevronDown, BsInfoCircle } from 'react-icons/bs';
 import { FaPaperPlane, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import '../styles/Itinerary.css';
@@ -14,6 +14,7 @@ interface ItineraryProps {
   isLoading: boolean;
   isOwner?: boolean;
   isReadOnly?: boolean;
+  formData?: TripFormData;
 }
 
 const Itinerary: React.FC<ItineraryProps> = ({ 
@@ -23,13 +24,15 @@ const Itinerary: React.FC<ItineraryProps> = ({
   onActivityRefresh,
   isLoading,
   isOwner = false,
-  isReadOnly = false
+  isReadOnly = false,
+  formData
 }) => {
   const [altSuggestions, setAltSuggestions] = useState<{[key: string]: string}>({});
   const [refreshingActivities, setRefreshingActivities] = useState<{[key: string]: boolean}>({});
   const [expandedDays, setExpandedDays] = useState<{[key: string]: boolean}>({});
   const [showCustomPreferences, setShowCustomPreferences] = useState<{[key: string]: boolean}>({});
   const [customPreferences, setCustomPreferences] = useState<{[key: string]: string}>({});
+  const [showTripInfo, setShowTripInfo] = useState<boolean>(false);
 
   const toggleDayExpanded = (dayIndex: number) => {
     setExpandedDays(prev => ({
@@ -222,6 +225,52 @@ const Itinerary: React.FC<ItineraryProps> = ({
     }
   };
 
+  const formatTripInfo = () => {
+    if (!formData) return null;
+    
+    const formatDate = (date: string) => {
+      return new Date(date).toLocaleDateString();
+    };
+    
+    const formatTravelersCount = () => {
+      const adults = formData.adults || 0;
+      const children = formData.children || 0;
+      const infants = formData.infants || 0;
+      const total = adults + children + infants;
+      
+      let result = `${total} traveler${total > 1 ? 's' : ''}`;
+      if (adults > 0) result += ` (${adults} adult${adults > 1 ? 's' : ''})`;
+      if (children > 0) result += ` (${children} child${children > 1 ? 'ren' : ''})`;
+      if (infants > 0) result += ` (${infants} infant${infants > 1 ? 's' : ''})`;
+      
+      return result;
+    };
+
+    const formatEntertainmentPreferences = () => {
+      if (!formData.entertainmentPreferences || formData.entertainmentPreferences.length === 0) {
+        return 'No specific preferences';
+      }
+      return formData.entertainmentPreferences
+        .map(pref => pref.charAt(0).toUpperCase() + pref.slice(1).replace(/([A-Z])/g, ' $1'))
+        .join(', ');
+    };
+
+    return {
+      travelType: formData.travelType?.charAt(0).toUpperCase() + formData.travelType?.slice(1) || 'Not specified',
+      origin: formData.origin || 'Not specified',
+      destination: formData.destination || 'Not specified',
+      dates: `${formatDate(formData.startDate)} - ${formatDate(formData.endDate)}`,
+      travelers: formatTravelersCount(),
+      budgetLevel: formData.budgetLevel?.charAt(0).toUpperCase() + formData.budgetLevel?.slice(1).replace('-', ' ') || 'Not specified',
+      language: formData.language === 'en' ? 'English' : formData.language?.toUpperCase() || 'Not specified',
+      cuisinePreference: formData.cuisinePreference?.charAt(0).toUpperCase() + formData.cuisinePreference?.slice(1) || 'Any',
+      entertainmentPreferences: formatEntertainmentPreferences(),
+      intermediateStops: formData.intermediateStops?.length || 0
+    };
+  };
+
+  const tripInfo = formatTripInfo();
+
   // Check if itinerary or itinerary.days is undefined
   if (!itinerary || !itinerary.days) {
     return (
@@ -233,6 +282,74 @@ const Itinerary: React.FC<ItineraryProps> = ({
 
   return (
     <div className="itinerary">
+      {/* Trip Information Panel */}
+      {tripInfo && (
+        <div className="trip-info-panel mb-4">
+          <Card className="shadow-sm">
+            <Card.Header 
+              className="bg-light cursor-pointer d-flex justify-content-between align-items-center"
+              onClick={() => setShowTripInfo(!showTripInfo)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="d-flex align-items-center">
+                <BsInfoCircle className="me-2 text-primary" />
+                <span className="fw-bold text-secondary">Trip Details</span>
+              </div>
+              <div className="toggle-icon">
+                {showTripInfo ? <BsChevronUp size={16} /> : <BsChevronDown size={16} />}
+              </div>
+            </Card.Header>
+            <Collapse in={showTripInfo}>
+              <Card.Body>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <div className="trip-info-item">
+                      <strong>Travel Type:</strong> {tripInfo.travelType}
+                    </div>
+                    <div className="trip-info-item">
+                      <strong>From:</strong> {tripInfo.origin}
+                    </div>
+                    <div className="trip-info-item">
+                      <strong>To:</strong> {tripInfo.destination}
+                    </div>
+                    <div className="trip-info-item">
+                      <strong>Dates:</strong> {tripInfo.dates}
+                    </div>
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <div className="trip-info-item">
+                      <strong>Travelers:</strong> {tripInfo.travelers}
+                    </div>
+                    <div className="trip-info-item">
+                      <strong>Budget Level:</strong> {tripInfo.budgetLevel}
+                    </div>
+                    <div className="trip-info-item">
+                      <strong>Language:</strong> {tripInfo.language}
+                    </div>
+                    <div className="trip-info-item">
+                      <strong>Cuisine:</strong> {tripInfo.cuisinePreference}
+                    </div>
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-12">
+                    <div className="trip-info-item">
+                      <strong>Entertainment Preferences:</strong> {tripInfo.entertainmentPreferences}
+                    </div>
+                    {tripInfo.intermediateStops > 0 && (
+                      <div className="trip-info-item">
+                        <strong>Intermediate Stops:</strong> {tripInfo.intermediateStops}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card.Body>
+            </Collapse>
+          </Card>
+        </div>
+      )}
+      
+      {/* Itinerary Days */}
       {itinerary.days.map((day, dayIndex) => {
         const isExpanded = isDayExpanded(dayIndex);
         

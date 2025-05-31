@@ -1,5 +1,36 @@
 /* Itinerary.css */
 
+/* Trip Information Panel Styles */
+.trip-info-panel .card-header {
+  background-color: #f8f9fa !important;
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s ease;
+}
+
+.trip-info-panel .card-header:hover {
+  background-color: #e9ecef !important;
+}
+
+.trip-info-panel .trip-info-item {
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.trip-info-panel .trip-info-item strong {
+  color: #495057;
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+.trip-info-panel .card {
+  border: 1px solid #e0e0e0;
+}
+
+.trip-info-panel .toggle-icon {
+  transition: transform 0.3s ease;
+}
+
 .itinerary .day-header {
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);

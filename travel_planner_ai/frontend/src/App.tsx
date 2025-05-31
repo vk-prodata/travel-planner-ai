@@ -63,7 +63,7 @@ const ReadOnlyBanner: React.FC<{ isReadOnlyMode?: boolean }> = ({ isReadOnlyMode
 };
 
 const MainApp = () => {
-  const { user, signOut, refreshUserCredits } = useAuth();
+  const { user, signOut, refreshUserCredits, ensureValidToken } = useAuth();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const location = useLocation();
@@ -270,12 +270,12 @@ const MainApp = () => {
           } catch (err) {
             console.error('Failed to refresh credits after auto-saving trip:', err);
           }
-        } catch (saveError: any) {
-          console.error('Error saving trip:', saveError);
+        } catch (error: any) {
+          console.error('Error saving trip:', error);
           setHasUnsavedChanges(true);
           
           // If it's not a conflict error, show generic error
-          if (!saveError.message?.includes('similar trip already exists')) {
+          if (!error.message?.includes('similar trip already exists')) {
             notifyError('Failed to save trip. Please try saving manually.', user?.email);
             return;
           }
@@ -309,7 +309,7 @@ const MainApp = () => {
               } catch (err) {
                 console.error('Failed to refresh credits after updating existing trip:', err);
               }
-            } catch (updateError) {
+            } catch (updateError: any) {
               console.error('Error updating trip:', updateError);
               setHasUnsavedChanges(true);
               notifyError('Failed to update existing trip. Please try saving manually.', user?.email);
@@ -320,7 +320,7 @@ const MainApp = () => {
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating trip:', error);
       notifyError(error instanceof Error ? error.message : 'Failed to generate trip', user?.email);
     } finally {
@@ -407,6 +407,13 @@ const MainApp = () => {
 
     setIsSaving(true);
     try {
+      // Ensure we have a valid token before making the request
+      const validToken = await ensureValidToken();
+      if (!validToken) {
+        notifyError('Authentication expired. Please sign in again.', user?.email);
+        return;
+      }
+      
       // Ensure the itinerary has a tripId and isOwner flag
       const itineraryWithId = {
         ...localItinerary,
@@ -509,7 +516,13 @@ const MainApp = () => {
         stack: error.stack,
         name: error.name
       });
-      notifyError(error.message || 'Failed to save trip. Please try again.', user?.email);
+      
+      // Check if it's an auth error and provide better feedback
+      if (error instanceof Error && (error.message.includes('401') || error.message.includes('expired') || error.message.includes('Authentication'))) {
+        notifyError('Your session has expired. Please sign in again to save changes.', user?.email);
+      } else {
+        notifyError(error.message || 'Failed to save trip. Please try again.', user?.email);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -608,7 +621,7 @@ const MainApp = () => {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error refreshing activity:', error);
       notifyError('Failed to refresh activity. Please try again.', user?.email);
       throw error;
@@ -644,6 +657,14 @@ const MainApp = () => {
     
     try {
       setIsSaving(true);
+      
+      // Ensure we have a valid token before making the request
+      const validToken = await ensureValidToken();
+      if (!validToken) {
+        notifyError('Authentication expired. Please sign in again.', user?.email);
+        return;
+      }
+      
       const newItinerary = {
         ...itinerary,
         title: editedTitle,
@@ -671,9 +692,15 @@ const MainApp = () => {
       if (window.location.pathname === '/trips') {
         window.location.reload();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving title:', error);
-      notifyError('Failed to save title', user?.email);
+      
+      // Check if it's an auth error and provide better feedback
+      if (error instanceof Error && error.message.includes('401')) {
+        notifyError('Authentication expired. Please sign in again.', user?.email);
+      } else {
+        notifyError('Failed to save title', user?.email);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -1066,6 +1093,7 @@ const MainApp = () => {
                     isLoading={isLoading}
                     isOwner={itinerary?.isOwner}
                     isReadOnly={isReadOnlyMode}
+                    formData={formData || undefined}
                   />
                 </div>
               ) : (

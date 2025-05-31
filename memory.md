@@ -649,4 +649,91 @@ Successfully implemented geolocation and autocomplete features for trip forms:
   - **Both Prompts Updated**: Applied improvements to both main prompt and aggressive retry prompt
 - **Expected Outcome**: Activities will strictly match user filters with comprehensive explanations of why each recommendation fits their specific needs and preferences
 
+### Collapsible Trip Information Panel - [Current Date]
+
+🦋 **Objective**: Add a collapsible panel at the top of the activity list showing trip filters/information from formData
+
+**Features Implemented:**
+1. **Trip Information Panel**:
+   - Added collapsible panel at the top of the Itinerary component
+   - Displays key trip details from formData object
+   - Collapsed by default to minimize visual clutter
+   - Clean, organized layout with two-column display for optimal space usage
+
+2. **Information Displayed**:
+   - **Travel Type**: Road trip, Flight, Train, or Cruise
+   - **Origin/Destination**: From and To locations  
+   - **Travel Dates**: Start and end dates (formatted)
+   - **Travelers**: Total count with breakdown (adults, children, infants)
+   - **Budget Level**: Budget preference level
+   - **Language**: Selected language preference
+   - **Cuisine Preference**: Food preference selection
+   - **Entertainment Preferences**: Selected entertainment activities (formatted)
+   - **Intermediate Stops**: Count of planned stops (if any)
+
+3. **Technical Implementation**:
+   - **Component**: Modified `travel_planner_ai/frontend/src/components/Itinerary.tsx`
+   - **Props**: Added `formData?: TripFormData` to ItineraryProps interface
+   - **State**: Added `showTripInfo` state (collapsed by default)
+   - **Helper Function**: Created `formatTripInfo()` to process and format all trip data
+   - **UI**: Used Bootstrap Collapse component with Card layout
+   - **Icons**: Added info circle and chevron icons for better UX
+
+4. **Styling**:
+   - **CSS File**: Added styles to `travel_planner_ai/frontend/src/styles/Itinerary.css`
+   - **Panel Styling**: Light background, hover effects, smooth transitions
+   - **Typography**: Organized layout with proper spacing and readable fonts
+   - **Responsive**: Works well on both desktop and mobile devices
+
+5. **Integration**:
+   - **App.tsx**: Updated to pass `formData` prop to Itinerary component
+   - **Type Safety**: Fixed TypeScript issues with null/undefined handling
+   - **Backwards Compatibility**: Panel only shows when formData is available
+
+**User Experience**:
+- Panel is collapsed by default to keep focus on the itinerary
+- Users can expand to see all trip filters and preferences that were used
+- Clear, organized presentation of all trip parameters
+- Helps users understand why certain activities were suggested
+- Easy to collapse back for clean itinerary view
+
+**Benefits**:
+- **Transparency**: Users can see exactly what filters influenced their itinerary
+- **Context**: Better understanding of why activities were selected
+- **Reference**: Easy access to trip details without navigating back to form
+- **Validation**: Users can verify their preferences were correctly applied
+
+### Google OAuth Token Refresh Implementation - [Current Date]
+
+- **Issue Identified**: "Failed to save title" error caused by expired Google OAuth access tokens (expire after 1 hour)
+- **Root Cause**: No token refresh mechanism, causing 401 "Invalid Credentials" errors when updating trips
+- **Error Pattern**: Backend logs showed repeated 401 responses from Google API during authentication
+- **Solution Implemented**: 
+  - **Automatic Token Refresh**: Added `refreshToken()` function in AuthContext to automatically refresh expired tokens
+  - **Token Validation**: Added `ensureValidToken()` function that tests current token and refreshes if expired  
+  - **Enhanced Error Handling**: Improved error messages for authentication issues in trip service
+  - **Session Management**: Clear localStorage on 401 errors and provide user-friendly messages
+  - **Graceful Fallback**: Sign out users if token refresh fails
+
+**Technical Implementation**:
+  - **AuthContext Updates**: Added token refresh and validation functions to auth context
+  - **Trip Service Enhancement**: Better 401 error handling with automatic token cleanup
+  - **Title Save Fix**: Updated `handleTitleSave()` to validate token before API calls
+  - **Trip Save Protection**: Updated `handleSaveTrip()` with token validation
+  - **TypeScript Fixes**: Properly typed all error catch blocks to resolve linter issues
+
+**Key Functions Added**:
+  - `refreshToken()`: Uses Google OAuth client to get new access token
+  - `ensureValidToken()`: Validates current token with test API call, refreshes if needed
+  - Enhanced error handling in `updateTrip()` with automatic session cleanup
+
+**User Experience**:
+  - **Seamless Operation**: Users won't see authentication errors during normal usage
+  - **Clear Error Messages**: "Your session has expired. Please sign in again." instead of generic errors
+  - **Automatic Recovery**: System attempts token refresh before showing errors
+  - **Session Protection**: Invalid tokens are automatically cleared to prevent confusion
+
+**Testing**: Created basic test suite for token refresh functionality
+**Expected Result**: Title saving and all authenticated operations should work reliably without token expiration errors
+
 // ... existing code ... 

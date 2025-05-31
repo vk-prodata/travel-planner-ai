@@ -8,6 +8,7 @@ interface AuthContextType {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshUserCredits: () => Promise<void>;
+  ensureValidToken: () => Promise<string | null>;
 }
 
 // Create context with default values
@@ -16,7 +17,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signIn: async () => {},
   signOut: async () => {},
-  refreshUserCredits: async () => {}
+  refreshUserCredits: async () => {},
+  ensureValidToken: async () => null
 });
 
 declare global {
@@ -248,12 +250,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Add token refresh function
+  const refreshToken = async (): Promise<string | null> => {
+    if (!tokenClient) {
+      console.log('No token client available for refresh');
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      tokenClient.callback = async (response: any) => {
+        if (response.error) {
+          console.error('Token refresh error:', response.error);
+          resolve(null);
+          return;
+        }
+
+        try {
+          const newToken = response.access_token;
+          console.log('Token refreshed successfully');
+          
+          // Update stored token
+          localStorage.setItem('token', newToken);
+          
+          resolve(newToken);
+        } catch (error) {
+          console.error('Error handling refreshed token:', error);
+          resolve(null);
+        }
+      };
+
+      tokenClient.requestAccessToken({
+        prompt: '', // Don't show consent screen for refresh
+        hint: user?.email || localStorage.getItem('userEmail') || ''
+      });
+    });
+  };
+
+  // Check if token is expired and refresh if needed
+  const ensureValidToken = async (): Promise<string | null> => {
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken) {
+      console.log('No token found');
+      return null;
+    }
+
+    try {
+      // Test current token with a simple API call
+      const testResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/credits/${user?.id}`, {
+        headers: {
+          'Authorization': `Bearer ${currentToken}`
+        }
+      });
+
+      if (testResponse.status === 401) {
+        console.log('Token expired, attempting refresh...');
+        const newToken = await refreshToken();
+        
+        if (!newToken) {
+          console.log('Token refresh failed, signing out user');
+          await signOut();
+          return null;
+        }
+        
+        return newToken;
+      }
+
+      if (testResponse.ok) {
+        console.log('Current token is still valid');
+        return currentToken;
+      }
+
+      console.log('Token validation failed with status:', testResponse.status);
+      return currentToken; // Return current token for other errors
+    } catch (error) {
+      console.error('Error validating token:', error);
+      return currentToken; // Return current token if validation fails
+    }
+  };
+
   // Function to refresh user credits
   const refreshUserCredits = async (): Promise<void> => {
     if (!user) return;
     
     try {
       console.log(`Refreshing credits for user: ${user.email}`);
+      
+      // Ensure we have a valid token before making the request
+      const validToken = await ensureValidToken();
+      if (!validToken) {
+        console.log('No valid token available for credits refresh');
+        return;
+      }
+      
       const creditsData = await getUserCredits(user.id);
       
       // Update user object with fresh credit data
@@ -278,7 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshUserCredits }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshUserCredits, ensureValidToken }}>
       {!loading && children}
     </AuthContext.Provider>
   );

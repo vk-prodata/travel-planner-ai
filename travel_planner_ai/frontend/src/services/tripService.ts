@@ -3,19 +3,6 @@ import { notifyError } from './errorService';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  
-  if (!token) {
-    throw new Error('No authentication token found');
-  }
-
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
-};
-
 export const saveTrip = async (tripData: {
   userId: string;
   formData: TripFormData;
@@ -74,7 +61,17 @@ export const updateTrip = async (
       throw new Error('Invalid itinerary structure. Please regenerate your itinerary.');
     }
 
-    const headers = getAuthHeaders();
+    // Get current token
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication required. Please sign in again.');
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+
     const response = await fetch(`${API_URL}/trips/${tripId}`, {
       method: 'PUT',
       headers,
@@ -98,7 +95,13 @@ export const updateTrip = async (
       });
 
       if (response.status === 401) {
-        throw new Error('Please sign in again to update your trip');
+        // Clear invalid token
+        localStorage.removeItem('token');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userName');
+        
+        throw new Error('Your session has expired. Please sign in again to save changes.');
       } else if (response.status === 403) {
         throw new Error('You do not have permission to update this trip');
       } else if (response.status === 404) {
