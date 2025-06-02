@@ -360,10 +360,10 @@ const Itinerary: React.FC<ItineraryProps> = ({
               onClick={() => toggleDayExpanded(dayIndex)}
               style={{ cursor: 'pointer' }}
             >
-              <div className="d-flex justify-content-between align-items-center p-3">
-                <h2 className="day-header mb-0">{day.date}</h2>
+              <div className="d-flex justify-content-between align-items-center p-2">
+                <h3 className="day-header mb-0">{day.date}</h3>
                 <div className="toggle-icon">
-                  {isExpanded ? <BsChevronUp size={20} /> : <BsChevronDown size={20} />}
+                  {isExpanded ? <BsChevronUp size={18} /> : <BsChevronDown size={18} />}
                 </div>
               </div>
             </div>

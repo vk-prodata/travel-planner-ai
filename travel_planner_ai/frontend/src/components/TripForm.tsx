@@ -37,6 +37,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
 
   const [dateError, setDateError] = useState<string | null>(null);
   const [stopError, setStopError] = useState<string | null>(null);
+  const [showOriginField, setShowOriginField] = useState<boolean>(false);
 
   const validateDates = (start: string, end: string): string | null => {
     if (!start || !end) return null; // Not enough info to validate yet
@@ -175,18 +176,20 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
 
       {/* Departure & Destination */}
       <Row className="mb-4">
-        <Col md={6}>
-          <LocationInput
-            label="From"
-            value={formData.origin || ''}
-            onChange={(value) => setFormData({...formData, origin: value})}
-            placeholder="Enter your starting location"
-            showGeolocation={true}
-            showAutocomplete={true}
-            required={true}
-          />
-        </Col>
-        <Col md={6}>
+        {showOriginField && (
+          <Col md={6}>
+            <LocationInput
+              label="From"
+              value={formData.origin || ''}
+              onChange={(value) => setFormData({...formData, origin: value})}
+              placeholder="Enter your starting location"
+              showGeolocation={true}
+              showAutocomplete={true}
+              required={false}
+            />
+          </Col>
+        )}
+        <Col md={showOriginField ? 6 : 12}>
           <LocationInput
             label="To"
             value={formData.destination}
@@ -195,6 +198,25 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
             showGeolocation={false}
             showAutocomplete={true}
             required={true}
+          />
+        </Col>
+      </Row>
+
+      {/* Add From Toggle */}
+      <Row className="mb-3">
+        <Col>
+          <Form.Check
+            type="checkbox"
+            id="show-origin-toggle"
+            label="Add starting location for route suggestions"
+            checked={showOriginField}
+            onChange={(e) => {
+              setShowOriginField(e.target.checked);
+              if (!e.target.checked) {
+                setFormData({...formData, origin: ''});
+              }
+            }}
+            className="text-muted"
           />
         </Col>
       </Row>
@@ -555,16 +577,22 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
             'adventure',
             'educational',
             'nightlife',
-            'must-see'
+            'must-see',
+            'hidden-gems'
           ].map((pref) => (
             <Button
               key={pref}
               variant={(formData.entertainmentPreferences || []).includes(pref as EntertainmentPreference) ? 'primary' : 'outline-primary'}
               onClick={() => togglePreference(pref as EntertainmentPreference)}
               size="sm"
-              className="text-capitalize"
+              className={`text-capitalize ${pref === 'hidden-gems' ? 'position-relative' : ''}`}
             >
               {pref.replace('-', ' ')}
+              {/* {pref === 'hidden-gems' && (
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" style={{fontSize: '0.6rem'}}>
+                  ✨
+                </span>
+              )} */}
             </Button>
           ))}
         </div>

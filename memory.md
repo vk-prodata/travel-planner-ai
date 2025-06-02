@@ -2,6 +2,52 @@
 
 ## Progress Updates
 
+### Hidden Gems Entertainment Feature Implementation - [Current Date]
+
+- **Feature Added**: Implemented "Hidden Gems" as a new entertainment preference option
+- **Frontend Implementation**:
+  - **Type Safety**: Added `'hidden-gems'` to `EntertainmentPreference` type in both `types/index.ts` and `types.ts`
+  - **UI Enhancement**: Added "Hidden Gems" button to entertainment preferences with special styling:
+    - Sparkle emoji badge (✨) as visual indicator
+    - Position-relative styling for badge placement
+    - Informational tooltip explaining the feature when selected
+  - **User Experience**: When selected, shows explanatory message about discovering "lesser-known, highly-rated places and unique experiences"
+  - **Loading Hints**: Added new tip about Hidden Gems feature in `TripLoadingHints.tsx` component
+- **Backend Implementation**:
+  - **AI Prompt Enhancement**: Modified `_generate_prompt()` in `ai_client.py` to handle hidden-gems preference
+  - **Specialized Instructions**: When hidden-gems is selected, adds specific prompt instructions:
+    - Focus on lesser-known, authentic local experiences
+    - Avoid major tourist attractions and mainstream venues
+    - Prioritize local favorites with excellent ratings but low tourist traffic
+    - Include off-the-beaten-path locations and family-run businesses
+    - Seek unique experiences showcasing authentic local culture
+    - Balance accessibility with authenticity
+  - **Retry Logic**: Updated retry prompts to also handle hidden gems preferences
+  - **Activity Refresh**: Enhanced activity refresh functionality to recognize hidden gems custom preferences
+- **Testing Implementation**:
+  - **Frontend Tests**: Created comprehensive test suite `HiddenGems.test.tsx`:
+    - UI appearance and styling tests
+    - Preference selection/deselection behavior
+    - Combination with other preferences
+    - Message display functionality
+    - Type safety validation
+  - **Backend Tests**: Created `test_hidden_gems.py`:
+    - AI prompt generation with hidden gems preferences  
+    - Integration with other entertainment preferences
+    - Retry scenario handling
+    - Activity refresh functionality testing
+    - Type validation and edge cases
+- **Technical Features**:
+  - **Smart Prompting**: Separates hidden-gems from other preferences for specialized handling
+  - **Backwards Compatibility**: Feature is optional and doesn't affect existing functionality
+  - **Quality Assurance**: Maintains all existing quality standards while adding unique discovery elements
+- **User Benefits**:
+  - Discover authentic local experiences away from tourist crowds
+  - Find highly-rated but lesser-known establishments
+  - Access unique cultural experiences and local favorites
+  - Explore off-the-beaten-path locations safely and accessibly
+- **Result**: Users can now select "Hidden Gems" to receive recommendations for authentic, lesser-known local experiences
+
 ### Language Filter Fix - Russian Language Support - [Current Date]
 
 - **Issue Identified**: Russian language selection was returning English results instead of Russian
@@ -599,21 +645,114 @@ Successfully implemented geolocation and autocomplete features for trip forms:
 - Consider adding more sophisticated location validation if needed
 - Monitor API usage and consider rate limiting if necessary 
 
-### UI Simplification Improvements - [Current Date]
+### UX Design Recommendation: "Add From" Toggle Implementation - [Current Date]
 
-- **Autocomplete Toggle Removal**: Removed autocomplete toggle switches from LocationInput component
-  - **Simplified Interface**: No more toggle switches to enable/disable autocomplete
-  - **Always Enabled**: Autocomplete is now always enabled when `showAutocomplete={true}` 
-  - **Cleaner Design**: Removed cluttered toggle controls from location input fields
-  - **Maintained Functionality**: All autocomplete features still work, just without manual toggle
-- **Title Size Reduction**: Made main "Travel Planner AI" title smaller
-  - **Font Size Change**: Changed from `fs-4` to `fs-5` class (smaller size)
-  - **Better Proportions**: Title is now less prominent and better balanced with other elements
-  - **Cleaner Header**: More space-efficient header design
+- **Feature**: Implemented toggle-based UX approach for trip planning with progressive disclosure
+- **UX Decision**: Destination-only by default with "Add From" toggle to reveal origin field
+- **Rationale**: 
+  - Minimal initial interface reduces cognitive load for new users
+  - Progressive enhancement for power users who want route optimization
+  - Cleaner, less cluttered form by default
+  - Backend already supports both patterns with route-based logic
+- **Frontend Implementation**:
+  - **Default State**: Only destination field visible initially
+  - **Toggle Control**: "Add From, if you want suggestions along your journey" checkbox
+  - **Progressive Disclosure**: Origin field appears when toggle is enabled
+  - **Smart Layout**: Destination field spans full width when origin hidden, half width when shown
+  - **Data Management**: Origin data automatically cleared when toggle is disabled
+  - **Clean Interface**: No helper text clutter - clear, direct messaging
+  - **Loading Hints**: Added new hint about "Add From" toggle feature
+- **Backend Validation**: 
+  - Existing implementation already handles both scenarios in `ai_client.py`
+  - Route logic: Activities along route from origin to destination when both provided
+  - Destination logic: Activities within reasonable distance of destination when origin not provided
+  - Trip hash generation includes origin for proper caching optimization
+
+### UX Cleanup: Simplified Toggle Interface - [Current Date]
+
+- **Objective**: Clean up the "Add From" toggle section by removing unnecessary helper text and optimizing the label
+- **Changes Made**:
+  - **Removed Helper Text**: Eliminated "✨ Route mode: We'll suggest activities along your journey" and "🎯 Your main destination" notes
+  - **Optimized Toggle Label**: Changed from "Add starting location for route optimization" to "Add From, if you want suggestions along your journey" 
+  - **Removed Redundant Messaging**: Eliminated additional explanatory text that was cluttering the interface
+  - **Simplified Layout**: Cleaner, more direct user interface with less cognitive load
+- **UX Benefits**:
+  - **Reduced Clutter**: Less text on screen makes the form feel cleaner and more focused
+  - **Clear Intent**: The new toggle label directly explains what happens when enabled
+  - **Better Flow**: Users can quickly understand and interact with the toggle without extra explanations
+  - **Professional Look**: Cleaner interface appears more polished and easier to use
+- **Technical Updates**:
+  - Updated `TripForm.tsx` to remove helper text elements
+  - Modified toggle label text for better clarity
+  - Updated test files to match new label text
+  - Maintained all existing functionality while improving presentation
+- **Result**: Cleaner, more professional toggle interface that clearly communicates purpose without unnecessary clutter
+
+### UX Simplification & Hidden Gems LOCAL Enhancement - [Current Date]
+
+- **Objective**: Further simplify UX by removing explanatory notes and enhance Hidden Gems to focus on LOCAL experiences
+- **UX Simplification**:
+  - **Removed Hidden Gems Note**: Eliminated the explanatory message that appeared when Hidden Gems was selected
+  - **Cleaner Interface**: No more expandable explanatory text cluttering the entertainment preferences section
+  - **Self-Explanatory Design**: The sparkle emoji badge (✨) on Hidden Gems button is sufficient visual indicator
+- **Hidden Gems LOCAL Enhancement**:
+  - **Strengthened LOCAL Focus**: Enhanced AI prompts to heavily emphasize LOCAL experiences
+  - **LOCAL Repetition Strategy**: Uses "LOCAL" repeatedly to reinforce importance of local vs tourist experiences
+  - **Specific LOCAL Categories**: 
+    - LOCAL favorites: family-run businesses, neighborhood spots, LOCAL institutions
+    - LOCAL venues: markets, festivals, community centers, family restaurants
+    - LOCAL businesses: owned shops, artisan workshops, cultural venues
+    - LOCAL neighborhoods: where residents actually live and work
+    - LOCAL culture: traditions, customs, stories, history, guides
+  - **Anti-Tourist Language**: Explicitly states "not tourist traps or chain establishments"
+  - **Accessibility Balance**: "Balance accessibility with LOCAL authenticity (safe and reachable LOCAL spots)"
+- **Technical Implementation**:
+  - **Frontend**: Removed explanatory div from `TripForm.tsx` entertainment preferences section
+  - **Backend**: Enhanced `_generate_prompt()` with comprehensive LOCAL-focused instructions
+  - **Retry Prompts**: Updated `_generate_aggressive_retry_prompt()` to maintain LOCAL focus in retry attempts
+  - **Prompt Structure**: Clear distinction between LOCAL experiences vs general recommendations
+- **Expected Results**:
+  - **Cleaner UX**: Users get clean interface without explanatory clutter
+  - **Better LOCAL Recommendations**: AI should now strongly favor places where locals actually go
+  - **Authentic Experiences**: More family-run businesses, local markets, neighborhood spots
+  - **Cultural Authenticity**: Greater emphasis on local traditions and community venues
+- **User Benefits**:
+  - **Simplified Interface**: Less visual clutter for easier decision-making
+  - **Authentic LOCAL Experiences**: Discover where locals actually eat, shop, and visit
+  - **Community Connection**: Experience destinations as locals do, not as tourists
+  - **Cultural Immersion**: Access to local traditions, customs, and community life
+
+### Prompt Optimization for Optional Origin - [Current Date]
+
+- **Objective**: Optimize AI prompt generation to better handle the new optional origin UX pattern
+- **Issue Identified**: Previous prompt logic didn't properly handle empty origin strings from the new toggle UX
+- **Optimizations Implemented**:
+  - **Improved Origin Detection**: Fixed logic to properly detect when origin is provided vs empty string
+  - **Two-Mode System**: Clear distinction between "Route Planning Mode" and "Destination-Focused Mode"
+  - **Geographic Context Enhancement**: 
+    - Route Mode: "Plan activities along or near the route from {origin} to {destination}"
+    - Destination Mode: "ALL activities must be within reasonable distance of {destination}"
+  - **Travel Mode Optimization**: Dynamic travel mode description based on origin availability
+  - **Traveler Info Compression**: More efficient traveler information formatting
+  - **Streamlined Formatting**: Cleaner prompt structure with better organization
 - **Technical Changes**:
-  - Modified `LocationInput.tsx`: Removed `autocompleteEnabled` state and `toggleAutocomplete` function
-  - Updated `App.tsx`: Changed title font size class from `fs-4` to `fs-5`
-  - Simplified component logic by removing toggle functionality
+  - **Fixed Origin Check**: Changed from `origin != 'Origin'` to `origin and origin.lower() != 'origin'`
+  - **String Handling**: Added `.strip()` to handle whitespace properly
+  - **Two-Path Logic**: Clear separation of route-based vs destination-focused planning
+  - **Consistent Updates**: Applied same optimizations to both main prompt and retry prompt
+  - **Token Efficiency**: Reduced redundant text while maintaining clarity
+- **Prompt Structure Improvements**:
+  - **Clear Mode Indicators**: Visual distinction between 🗺️ Route Planning and 🎯 Destination-Focused modes
+  - **Contextual Instructions**: Mode-specific guidance for activity planning
+  - **Efficient Layout**: Compressed traveler info and formatting for better token usage
+  - **Consistent Language**: Aligned terminology between main and retry prompts
+- **Expected Results**:
+  - **Better Default Behavior**: Destination-only planning works more effectively
+  - **Clearer Route Planning**: When origin is provided, route optimization is more explicit
+  - **Improved Token Efficiency**: Streamlined prompts use tokens more effectively
+  - **Consistent Quality**: Both modes produce high-quality, relevant recommendations
+- **Cache Considerations**: Origin changes properly trigger cache invalidation due to improved detection logic
+- **Result**: AI prompts now properly adapt to the optional origin UX, providing optimal planning for both destination-only and route-based trips
 
 ### Token Optimization - Deprecated Coordinates and Activity IDs - [Current Date]
 

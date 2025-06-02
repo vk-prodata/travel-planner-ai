@@ -57,7 +57,7 @@ export interface Stop {
 
 export type TravelType = 'flight' | 'train' | 'road' | 'bus' | 'cruise';
 
-export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food' | 'adventure' | 'educational' | 'nightlife' | 'must-see';
+export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food' | 'adventure' | 'educational' | 'nightlife' | 'must-see' | 'hidden-gems';
 
 export type CuisineType = 
   | 'any' 

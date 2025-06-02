@@ -9,7 +9,8 @@ export type EntertainmentPreference =
   | 'adventure'      // For thrill-seeking activities
   | 'educational'    // For museums, workshops, etc.
   | 'nightlife'
-  | 'must-see';      // Add new option
+  | 'must-see'
+  | 'hidden-gems';   // For lesser-known, highly-rated places
 
 export interface Stop {
   destination: string;

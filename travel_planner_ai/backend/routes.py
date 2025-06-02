@@ -396,138 +396,48 @@ async def refresh_activity(
         logger.info(f"Refreshing activity for user {current_user.get('email')}")
         logger.debug(f"Request data: {request}")
         
-        # Check if we have an AI provider preference set in user's session or data
-        # For now, we'll default to OpenAI as the provider for activity refreshes
-        ai_provider = "openai"  # Default provider
-        
-        # If using a consistent provider across the application, 
-        # you might retrieve it from a user setting or session
-        # ai_provider = current_user.get("preferred_ai_provider", "openai")
-        
-        # Set the AI provider for this request
-        ai_client.set_provider(ai_provider)
+        ai_provider = "openai"  # Default provider for now
+        ai_client.set_provider(ai_provider) # Ensure client is set to the desired provider
         
         activity_type = request.activity.get('type', 'activity').lower()
         is_meal = activity_type == 'meal' or activity_type == 'food'
         
-        # Generate a new activity using AI
-        prompt = f"""
-        Generate a new activity to replace:
-        {request.activity.get('description')}
-        
-        IMPORTANT: Use this EXACT format:
-        [ACTIVITY_START]
-        Time: {request.activity.get('time')}
-        Type: {activity_type}
-        Description: (new activity description)
-        Why: Explanation of why this activity is recommended
-        Price: free|$|$$|$$$
-        Location: Specific place name
-        [ACTIVITY_END]
-
-        Rules:
-        1. Keep the same time slot: {request.activity.get('time')}
-        2. Keep similar type of activity and use the same responselanguage
-        3. Make it family-friendly and engaging
-        4. Include specific details and locations
-        5. For the Location field, provide the exact name of the place (restaurant, museum, park, etc.)
-        """
-        
-        # TODO: Deprecated Coordinates June 2025 - coordinates no longer requested in refresh activity prompt
-        # Old code: 6. For the Coordinates field, provide the latitude and longitude if available, otherwise leave it blank
-        # Old code: Coordinates: latitude,longitude (if available)
-
-        # Add user custom preferences if provided
-        if request.custom_preferences:
-            prompt += f"""
-        7. The user has specified the following preferences for this activity:
-           "{request.custom_preferences}"
-           Make sure the generated activity strongly aligns with these preferences.
-        """
-        
-        # Add specific instructions for meal activities
-        if is_meal:
-            prompt += """
-        8. For meal activities, provide 2-3 specific restaurant options with brief descriptions
-           Format the description exactly like this: 
-           "Options include: 
-           1. Restaurant Name - Brief description of cuisine and ambiance. 
-           2. Restaurant Name - Brief description. 
-           3. Restaurant Name - Brief description."
-           
-           IMPORTANT: Make sure each numbered restaurant option is on its own line, and use proper spacing.
-           Do NOT split restaurant names across multiple lines.
-        """
-        
         try:
-            model_config = get_model_config(ai_client.model)
-            response = await ai_client.client.chat.completions.create(
-                model=ai_client.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided. It should be the same city as the original activity. For meal activities, always suggest 2-3 specific restaurant options with brief descriptions."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                **model_config
+            # Call the new method in AIClient
+            new_activity = await ai_client.refresh_activity_suggestion(
+                original_activity=request.activity,
+                custom_preferences=request.custom_preferences,
+                activity_type=activity_type,
+                is_meal=is_meal
             )
             
-            content = response.choices[0].message.content
-            logger.debug(f"AI response for refresh using {ai_provider} provider: {content}")
-            
-            # Parse the new activity
-            lines = [line.strip() for line in content.split('\n') if line.strip()]
-            new_activity = {
-                # TODO: Deprecated Activity ID June 2025 - activity ID no longer copied or generated in refresh
-                # 'id': request.activity.get('id'),
-                'time': request.activity.get('time'),
-                'type': activity_type
-            }
-            
-            for line in lines:
-                if line.startswith('Time: '):
-                    new_activity['time'] = line.replace('Time: ', '').strip()
-                elif line.startswith('Type: '):
-                    new_activity['type'] = line.replace('Type: ', '').strip().lower()
-                elif line.startswith('Description: '):
-                    new_activity['description'] = line.replace('Description: ', '').strip()
-                elif line.startswith('Location: '):
-                    new_activity['location'] = line.replace('Location: ', '').strip()
-                # TODO: Deprecated Coordinates June 2025 - coordinate parsing no longer performed in refresh activity
-                # elif line.startswith('Coordinates: '):
-                #     coordinates = line.replace('Coordinates: ', '').strip()
-                #     if coordinates and coordinates != '(latitude,longitude if available)':
-                #         new_activity['coordinates'] = coordinates
-                elif line.startswith('Price: '):
-                    price = line.replace('Price: ', '').strip()
-                    # Only store price
-                    new_activity['price'] = price
-                elif line.startswith('Why: '):
-                    new_activity['why'] = line.replace('Why: ', '').strip()
-            
-            if not new_activity.get('description'):
-                raise ValueError("No description generated for new activity")
-            
-            logger.info(f"Successfully generated new activity with {ai_provider} provider: {json.dumps(new_activity, indent=2)}")
+            logger.info(f"Successfully generated new activity via AIClient with {ai_provider} provider: {json.dumps(new_activity, indent=2)}")
             
             return {
                 "success": True,
                 "activity": new_activity
             }
             
+        except ValueError as ve:
+            logger.error(f"Error generating new activity via AIClient: {str(ve)}", exc_info=True)
+            # Specific error for value errors from AIClient (e.g. no description)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to refresh activity content: {str(ve)}"
+            )
         except Exception as e:
             logger.error(f"Error refreshing activity with {ai_provider}: {str(e)}", exc_info=True)
+            # General error from AIClient or other issues
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to refresh activity: {str(e)}"
             )
-    except Exception as e:
+            
+    except HTTPException as he: # Catch HTTPExceptions raised above or by dependencies
+        raise he
+    except Exception as e: # Catch any other unexpected errors in the route handler itself
         logger.error(f"Error in refresh activity endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail=f"An unexpected error occurred while refreshing the activity: {str(e)}"
         )

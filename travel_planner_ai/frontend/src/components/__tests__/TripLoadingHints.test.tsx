@@ -32,15 +32,15 @@ describe('TripLoadingHints', () => {
     
     expect(screen.getByText('Choose Entertainment Activities')).toBeInTheDocument();
     expect(screen.getByText(/Always select Entertainment preferences/)).toBeInTheDocument();
-    expect(screen.getByText('Tip 1 of 10')).toBeInTheDocument();
+    expect(screen.getByText('Tip 1 of 11')).toBeInTheDocument();
   });
 
   test('shows progress indicator with correct number of dots', () => {
     render(<TripLoadingHints />);
     
-    // Should have 10 dots for 10 hints
-    const dots = screen.getByText('Tip 1 of 10').parentElement?.querySelectorAll('span[style*="width: 6px"]');
-    expect(dots).toHaveLength(10);
+    // Should have 11 dots for 11 hints
+    const dots = screen.getByText('Tip 1 of 11').parentElement?.querySelectorAll('span[style*="width: 6px"]');
+    expect(dots).toHaveLength(11);
   });
 
   test('displays entertainment activities hint with correct icon', () => {
@@ -59,12 +59,12 @@ describe('TripLoadingHints', () => {
     // Fast-forward time to trigger hint change (20 seconds + 500ms transition)
     jest.advanceTimersByTime(20500);
     
-    // Should now show second hint
+    // Should now show second hint (Discover Hidden Gems)
     await waitFor(() => {
-      expect(screen.getByText('Refresh Any Activity')).toBeInTheDocument();
+      expect(screen.getByText('Discover Hidden Gems')).toBeInTheDocument();
     });
     
-    expect(screen.getByText('Tip 2 of 10')).toBeInTheDocument();
+    expect(screen.getByText('Tip 2 of 11')).toBeInTheDocument();
   });
 
   test('cycles through all hints correctly', async () => {
