@@ -36,7 +36,20 @@ export const generateItinerary = async (formData: TripFormData, userId: string):
     }
 
     const data = await response.json();
-    if (!data.success || !data.itinerary) {
+    
+    // Handle warning/error responses from AI generation
+    if (!data.success) {
+      const warningError = new Error(data.message || 'AI generation encountered an issue');
+      // Attach additional info for the frontend to potentially display
+      (warningError as any).errorType = data.error_type;
+      (warningError as any).suggestions = data.suggestions || [];
+      (warningError as any).partialData = data.partial_data;
+      (warningError as any).requestedDays = data.requested_days;
+      (warningError as any).partialDaysReceived = data.partial_days_received;
+      throw warningError;
+    }
+    
+    if (!data.itinerary) {
       throw new Error('Invalid response format from server');
     }
 

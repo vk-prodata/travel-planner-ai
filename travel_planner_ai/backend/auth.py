@@ -5,7 +5,9 @@ import logging
 from .config import settings
 from .database import get_user_collection
 from .services.user_service import create_user_if_not_exists
+from .services.jwt_service import jwt_service
 from datetime import datetime
+from .models.user import User as UserModel # Import here to avoid circular dependency at module level
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -16,9 +18,39 @@ async def get_current_user(
 ) -> dict:
     try:
         token = credentials.credentials
-        logger.info("=== Starting Google Auth Process ===")
+        logger.info("=== Starting Auth Process ===")
         logger.info(f"Token type: {type(token)}")
         logger.info(f"Token first 10 chars: {token[:10]}...")
+
+        # First, try to verify as JWT token
+        try:
+            payload = jwt_service.verify_token(token)
+            if payload.get("type") == "access":
+                logger.info("JWT token verified successfully")
+                user_id = payload.get("sub")
+                
+                # Get user from database
+                user = users_collection.find_one({"_id": user_id})
+                if not user:
+                    logger.error(f"User with ID {user_id} not found in database")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="User not found"
+                    )
+                
+                logger.info(f"User found via JWT: {user.get('email')}")
+                # Ensure the returned user dict is consistent, similar to the OAuth path
+                # by running it through the Pydantic model if it's not already
+                validated_user = UserModel.model_validate(user) # Validate and transform (applies alias)
+                return validated_user.model_dump() # Return as dict with 'id' field
+        except HTTPException as jwt_error:
+            if jwt_error.status_code == 401:
+                logger.info("JWT token verification failed, trying Google OAuth")
+            else:
+                raise jwt_error
+
+        # Fallback to Google OAuth verification
+        logger.info("Attempting Google OAuth verification")
 
         # Get user info directly using the access token
         userinfo_endpoint = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -80,10 +112,12 @@ async def get_current_user(
             
         logger.info("=== Final User Data ===")
         logger.info(f"Final user object returned: {user}")
-        logger.info("=== End Google Auth Process ===")
+        logger.info("=== End Auth Process ===")
         
         return user
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Authentication error: {str(e)}")
         logger.error(f"Error type: {type(e)}")

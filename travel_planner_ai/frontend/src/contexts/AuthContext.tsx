@@ -88,6 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               client_id: clientId,
               scope: 'email profile openid',
               callback: handleCredentialResponse,
+              access_type: 'offline',
+              prompt: 'consent'
             });
             
             setTokenClient(client);
@@ -127,6 +129,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const backendUser = await backendResponse.json();
       console.log('Backend auth successful:', backendUser);
 
+      // Extract JWT tokens from response headers
+      const jwtAccessToken = backendResponse.headers.get('X-Access-Token');
+      const jwtRefreshToken = backendResponse.headers.get('X-Refresh-Token');
+
       // Create user data from backend response
       const userData: User = {
         id: backendUser.id,
@@ -141,11 +147,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData);
       console.log('User state set:', userData);
 
-      // Store the token, email, ID, and name
-      localStorage.setItem('token', token);
+      // Store the JWT tokens primarily, keep Google token as backup
+      if (jwtAccessToken) {
+        localStorage.setItem('token', jwtAccessToken);
+        localStorage.setItem('tokenType', 'jwt');
+        console.log('Stored JWT access token');
+      } else {
+        localStorage.setItem('token', token);
+        localStorage.setItem('tokenType', 'google');
+        console.log('Stored Google token as fallback');
+      }
+
+      if (jwtRefreshToken) {
+        localStorage.setItem('jwtRefreshToken', jwtRefreshToken);
+        console.log('Stored JWT refresh token');
+      }
+
       localStorage.setItem('userEmail', userData.email);
       localStorage.setItem('userId', userData.id);
       localStorage.setItem('userName', userData.name || '');
+      localStorage.setItem('tokenTimestamp', Date.now().toString());
       console.log('Saved auth data to localStorage');
     } catch (error) {
       console.error('Error handling credential:', error);
@@ -166,11 +187,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('Auth Response:', {
               tokenType: response.token_type,
               scope: response.scope,
-              // Don't log the full token for security
-              tokenLength: response.access_token?.length
+              tokenLength: response.access_token?.length,
+              hasRefreshToken: !!response.refresh_token
             });
 
             const token = response.access_token;
+            const refreshToken = response.refresh_token;
             
             // First, verify with our backend
             console.log('Sending token to backend for verification');
@@ -179,7 +201,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ token })
+              body: JSON.stringify({ 
+                token,
+                refresh_token: refreshToken 
+              })
             });
 
             if (!backendResponse.ok) {
@@ -189,6 +214,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             const backendUser = await backendResponse.json();
             console.log('Backend auth successful:', backendUser);
+
+            // Extract JWT tokens from response headers
+            const jwtAccessToken = backendResponse.headers.get('X-Access-Token');
+            const jwtRefreshToken = backendResponse.headers.get('X-Refresh-Token');
 
             // Create user data from backend response
             const userData: User = {
@@ -204,11 +233,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(userData);
             console.log('User state set:', userData);
 
-            // Store the token, email, ID, and name
-            localStorage.setItem('token', token);
+            // Store the JWT tokens primarily, keep Google token as backup
+            if (jwtAccessToken) {
+              localStorage.setItem('token', jwtAccessToken);
+              localStorage.setItem('tokenType', 'jwt');
+              console.log('Stored JWT access token');
+            } else {
+              localStorage.setItem('token', token);
+              localStorage.setItem('tokenType', 'google');
+              console.log('Stored Google token as fallback');
+            }
+
+            if (jwtRefreshToken) {
+              localStorage.setItem('jwtRefreshToken', jwtRefreshToken);
+              console.log('Stored JWT refresh token');
+            }
+
             localStorage.setItem('userEmail', userData.email);
             localStorage.setItem('userId', userData.id);
             localStorage.setItem('userName', userData.name || '');
+            localStorage.setItem('tokenTimestamp', Date.now().toString());
             console.log('Saved auth data to localStorage');
             
             resolve();
@@ -233,6 +277,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
           // Remove all user data from localStorage
           localStorage.removeItem('token');
+          localStorage.removeItem('tokenType');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('jwtRefreshToken');
+          localStorage.removeItem('tokenTimestamp');
           localStorage.removeItem('userEmail');
           localStorage.removeItem('userId');
           localStorage.removeItem('userName');
@@ -243,6 +291,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       // Remove all user data from localStorage
       localStorage.removeItem('token');
+      localStorage.removeItem('tokenType');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('jwtRefreshToken');
+      localStorage.removeItem('tokenTimestamp');
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userId');
       localStorage.removeItem('userName');
@@ -252,6 +304,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Add token refresh function
   const refreshToken = async (): Promise<string | null> => {
+    const jwtRefreshToken = localStorage.getItem('jwtRefreshToken');
+    const tokenType = localStorage.getItem('tokenType');
+    
+    // Try JWT refresh first if we have a JWT refresh token
+    if (jwtRefreshToken && tokenType === 'jwt') {
+      try {
+        console.log('Using JWT refresh token to get new access token');
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            refresh_token: jwtRefreshToken
+          })
+        });
+
+        if (response.ok) {
+          const tokenData = await response.json();
+          const newToken = tokenData.access_token;
+          
+          console.log('JWT token refreshed successfully');
+          localStorage.setItem('token', newToken);
+          localStorage.setItem('tokenTimestamp', Date.now().toString());
+          
+          return newToken;
+        } else {
+          console.error('JWT refresh token request failed:', response.status);
+          // Fall through to try Google token refresh
+        }
+      } catch (error) {
+        console.error('Error using JWT refresh token:', error);
+        // Fall through to try Google token refresh
+      }
+    }
+
+    const storedRefreshToken = localStorage.getItem('refreshToken');
+    
+    if (storedRefreshToken) {
+      // Use Google refresh token to get new access token
+      try {
+        console.log('Using Google refresh token to get new access token');
+        const response = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
+            refresh_token: storedRefreshToken,
+            grant_type: 'refresh_token'
+          })
+        });
+
+        if (response.ok) {
+          const tokenData = await response.json();
+          const newToken = tokenData.access_token;
+          
+          console.log('Google token refreshed successfully');
+          localStorage.setItem('token', newToken);
+          localStorage.setItem('tokenType', 'google');
+          localStorage.setItem('tokenTimestamp', Date.now().toString());
+          
+          return newToken;
+        } else {
+          console.error('Google refresh token request failed:', response.status);
+        }
+      } catch (error) {
+        console.error('Error using Google refresh token:', error);
+      }
+    }
+
+    // Fallback to requesting new token via Google OAuth flow
     if (!tokenClient) {
       console.log('No token client available for refresh');
       return null;
@@ -267,10 +392,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         try {
           const newToken = response.access_token;
-          console.log('Token refreshed successfully');
+          const newRefreshToken = response.refresh_token;
           
-          // Update stored token
+          console.log('Token refreshed successfully via OAuth flow');
+          
+          // Update stored tokens
           localStorage.setItem('token', newToken);
+          localStorage.setItem('tokenType', 'google');
+          localStorage.setItem('tokenTimestamp', Date.now().toString());
+          if (newRefreshToken) {
+            localStorage.setItem('refreshToken', newRefreshToken);
+          }
           
           resolve(newToken);
         } catch (error) {
@@ -289,9 +421,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check if token is expired and refresh if needed
   const ensureValidToken = async (): Promise<string | null> => {
     const currentToken = localStorage.getItem('token');
+    const tokenTimestamp = localStorage.getItem('tokenTimestamp');
+    const tokenType = localStorage.getItem('tokenType');
+    
     if (!currentToken) {
       console.log('No token found');
       return null;
+    }
+
+    // JWT tokens last 7 days, Google tokens last 1 hour
+    const TOKEN_LIFETIME = tokenType === 'jwt' 
+      ? 6 * 24 * 60 * 60 * 1000  // 6 days (refresh 1 day early)
+      : 50 * 60 * 1000;          // 50 minutes for Google tokens
+
+    const now = Date.now();
+    const tokenAge = tokenTimestamp ? now - parseInt(tokenTimestamp) : TOKEN_LIFETIME + 1;
+
+    if (tokenAge > TOKEN_LIFETIME) {
+      console.log(`${tokenType?.toUpperCase()} token is likely expired based on age, attempting refresh...`);
+      const newToken = await refreshToken();
+      
+      if (!newToken) {
+        console.log('Token refresh failed, signing out user');
+        await signOut();
+        return null;
+      }
+      
+      return newToken;
     }
 
     try {

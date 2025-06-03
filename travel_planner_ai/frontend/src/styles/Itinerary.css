@@ -75,6 +75,7 @@
   display: inline-block;
 }
 
+/* Simplified .itinerary .activity-type and .badge styles */
 .itinerary .activity-type {
   display: flex;
   align-items: center;
@@ -82,11 +83,15 @@
 }
 
 .itinerary .activity-type .badge {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
+  /* Basic badge styling from inline styles, specific colors applied there */
+  font-size: 0.75rem; /* Matches inline */
+  padding: 0.3rem 0.6rem; /* Matches inline */
   white-space: nowrap;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
 }
 
+/* Keep this for consistent spacing if needed */
 .itinerary .d-flex.justify-content-between.align-items-center {
   gap: 0.5rem;
 }
@@ -205,4 +210,14 @@
     margin: 2px 0;
     width: 100%;
   }
-} 
+}
+
+/* Removed complex badge styles and animations below this line */
+/* .itinerary .badge { ... } (complex version removed) */
+/* .itinerary .badge:hover { ... } (complex version removed) */
+/* .itinerary .activity-type .badge { ... } (complex version removed) */
+/* .itinerary .activity-type .badge::before { ... } (complex version removed) */
+/* @keyframes shimmer { ... } (removed) */
+/* @keyframes radiantGlow { ... } (removed) */
+/* .itinerary .badge[style*="FFD700"] { ... } (removed) */
+/* .itinerary .badge[style*="FFD700"]:hover { ... } (removed) */ 

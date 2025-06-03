@@ -8,17 +8,107 @@ from cachetools import TTLCache
 from dotenv import load_dotenv
 import re
 from datetime import datetime, timedelta
-import uuid
 from langdetect import detect
 from typing import Dict, Any, Optional, Literal
 import hashlib
 from openai import AsyncOpenAI
 from travel_planner_ai.backend.config.ai_config import AI_CONFIG, get_model_config
 
-load_dotenv()  # Load environment variables from a .env file
+load_dotenv(dotenv_path="travel_planner_ai/.env")  # Load environment variables from the correct .env file
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+# Environment-based debug control
+DEBUG_LOGGING_ENABLED = os.getenv('AI_DEBUG_LOGGING', 'false').lower() in ('true', '1', 'yes', 'on')
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development').lower()
+
+# Enable debug logging in development/testing environments
+if ENVIRONMENT in ('development', 'testing', 'dev', 'test') or DEBUG_LOGGING_ENABLED:
+    DEBUG_LOGGING_ENABLED = True
+    logger.info("🔍 Debug logging enabled for AI client")
+else:
+    DEBUG_LOGGING_ENABLED = False
+    logger.info("🔇 Debug logging disabled for production environment")
+
+def _debug_log_prompts(attempt: int, system_content: str, prompt: str):
+    """Log prompt details only in debug mode"""
+    if not DEBUG_LOGGING_ENABLED:
+        return
+    
+    logger.info(f"[PROMPT DEBUG] === SYSTEM MESSAGE (attempt {attempt + 1}) ===")
+    logger.info(f"[PROMPT DEBUG] {system_content}")
+    logger.info(f"[PROMPT DEBUG] === USER PROMPT (attempt {attempt + 1}) ===")
+    logger.info(f"[PROMPT DEBUG] {prompt[:1000]}{'...' if len(prompt) > 1000 else ''}")
+    logger.info(f"[PROMPT DEBUG] === END PROMPTS ===")
+
+def _debug_log_response(attempt: int, content: str):
+    """Log full response only in debug mode"""
+    if not DEBUG_LOGGING_ENABLED:
+        return
+    
+    logger.info(f"[RESPONSE DEBUG] === FULL AI RESPONSE (attempt {attempt + 1}) ===")
+    logger.info(f"[RESPONSE DEBUG] {content}")
+    logger.info(f"[RESPONSE DEBUG] === END RESPONSE ===")
+
+def _debug_log_response_structure(content: str, expected_days: int):
+    """Log response structure analysis only in debug mode"""
+    if not DEBUG_LOGGING_ENABLED:
+        return
+    
+    day_starts = content.count('[DAY_START]')
+    day_ends = content.count('[DAY_END]')
+    activity_starts = content.count('[ACTIVITY_START]')
+    activity_ends = content.count('[ACTIVITY_END]')
+    
+    logger.info(f"[STRUCTURE DEBUG] Day blocks: {day_starts} starts, {day_ends} ends")
+    logger.info(f"[STRUCTURE DEBUG] Activity blocks: {activity_starts} starts, {activity_ends} ends")
+    logger.info(f"[STRUCTURE DEBUG] Expected days: {expected_days}, Found days: {day_starts}")
+    
+    # Check if response was truncated
+    if content.endswith('...') or not content.endswith('[DAY_END]'):
+        logger.warning(f"[TRUNCATION DEBUG] Response appears to be truncated!")
+        logger.warning(f"[TRUNCATION DEBUG] Last 200 chars: {content[-200:]}")
+
+def _debug_log_token_analysis(token_usage: dict, model: str, provider: str, content: str = None):
+    """Log detailed token analysis only in debug mode"""
+    if not DEBUG_LOGGING_ENABLED or not token_usage:
+        return
+    
+    from travel_planner_ai.backend.config.ai_config import get_model_config
+    model_config = get_model_config(model)
+    max_tokens_setting = model_config.get('max_tokens', 16000)
+    
+    # Calculate percentages
+    prompt_pct = (token_usage['prompt_tokens'] / token_usage['total_tokens']) * 100
+    completion_pct = (token_usage['completion_tokens'] / token_usage['total_tokens']) * 100
+    utilization_pct = (token_usage['total_tokens'] / max_tokens_setting) * 100
+    
+    logger.info(f"[TOKEN ANALYSIS] === DETAILED TOKEN BREAKDOWN ===")
+    logger.info(f"[TOKEN ANALYSIS] Model: {model} | Provider: {provider.upper()}")
+    logger.info(f"[TOKEN ANALYSIS] Max tokens setting: {max_tokens_setting}")
+    logger.info(f"[TOKEN ANALYSIS] Prompt overhead: {token_usage['prompt_tokens']} tokens ({prompt_pct:.1f}%)")
+    logger.info(f"[TOKEN ANALYSIS] Content generated: {token_usage['completion_tokens']} tokens ({completion_pct:.1f}%)")
+    logger.info(f"[TOKEN ANALYSIS] Total utilization: {token_usage['total_tokens']}/{max_tokens_setting} ({utilization_pct:.1f}%)")
+    
+    # Tokens per day analysis if content is provided
+    if content:
+        days_found = content.count('[DAY_START]')
+        if days_found > 0:
+            tokens_per_day = token_usage['completion_tokens'] / days_found
+            logger.info(f"[TOKEN ANALYSIS] Tokens per day generated: {tokens_per_day:.1f}")
+            if tokens_per_day < 200:
+                logger.warning(f"[TOKEN ANALYSIS] LOW DETAIL: Only {tokens_per_day:.1f} tokens per day - content may be too brief")
+    
+    # Efficiency warnings with more context
+    if prompt_pct > 40:
+        logger.warning(f"[TOKEN ANALYSIS] HIGH PROMPT OVERHEAD: {prompt_pct:.1f}% - consider shorter prompts")
+    if utilization_pct < 50:
+        logger.warning(f"[TOKEN ANALYSIS] LOW UTILIZATION: Only {utilization_pct:.1f}% of available tokens used")
+    if token_usage['completion_tokens'] < 1000:
+        logger.warning(f"[TOKEN ANALYSIS] SHORT COMPLETION: Only {token_usage['completion_tokens']} completion tokens - AI may be stopping early")
+    
+    logger.info(f"[TOKEN ANALYSIS] === END TOKEN ANALYSIS ===")
 
 def ai_model_decorator(model: str = None):
     """Decorator to specify which model to use for the API call"""
@@ -46,6 +136,13 @@ class AIClient:
             cache_ttl: Cache time-to-live in seconds (default: 1 hour)
             provider: AI provider to use ("openai" or "deepseek")
         """
+        self.cache = TTLCache(maxsize=500, ttl=cache_ttl)
+        self._setup_provider(provider, api_key)
+        
+        logger.info(f"AIClient initialized with provider: {self.provider}, model: {self.model}")
+    
+    def _setup_provider(self, provider: str, api_key: str = None):
+        """Setup provider configuration and initialize client"""
         self.provider = provider.lower()
         
         # Set the appropriate API key based on provider
@@ -57,8 +154,15 @@ class AIClient:
         elif self.provider == "deepseek":
             self.api_key = api_key or os.getenv("DS_OPENAI_API_KEY")
             if not self.api_key:
-                raise ValueError("DeepSeek API key must be provided either directly or via DS_OPENAI_API_KEY environment variable")
-            self.base_url = "https://api.deepseek.com/v1"
+                logger.warning("DeepSeek API key not found (DS_OPENAI_API_KEY). Falling back to OpenAI.")
+                # Fallback to OpenAI
+                self.provider = "openai"
+                self.api_key = os.getenv("OPENAI_API_KEY")
+                self.base_url = None
+                if not self.api_key:
+                    raise ValueError("Neither DeepSeek nor OpenAI API keys found. Please set DS_OPENAI_API_KEY or OPENAI_API_KEY environment variables.")
+            else:
+                self.base_url = "https://api.deepseek.com/v1"
         else:
             raise ValueError(f"Unsupported provider: {provider}. Supported providers are 'openai' and 'deepseek'")
             
@@ -70,9 +174,6 @@ class AIClient:
         
         # Set the appropriate model based on provider
         self.model = self._get_default_model()
-        self.cache = TTLCache(maxsize=500, ttl=cache_ttl)
-        
-        logger.info(f"AIClient initialized with provider: {self.provider}, model: {self.model}")
     
     def _get_default_model(self) -> str:
         """Get the default model for the selected provider"""
@@ -84,37 +185,38 @@ class AIClient:
     
     def _generate_cache_key(self, prompt_args: Dict[str, Any]) -> str:
         """Generate a unique cache key from the prompt arguments"""
-        # Filter prompt_args to only include keys relevant for caching itinerary generation
+        # Include ALL fields that affect trip generation to ensure correct caching
         relevant_keys = [
-            "destination", "startDate", "endDate", "travelType", "adults",
-            "children", "infants", "budgetLevel", "entertainmentPreferences",
-            "intermediateStops", "cuisinePreference", "language", "aiProvider"  # Added aiProvider to cache key
+            "userId", "destination", "startDate", "endDate", "travelType", 
+            "adults", "children", "infants", "budgetLevel", "language",
+            "entertainmentPreferences", "cuisinePreference", "origin"
         ]
         
         key_data = {}
         for key in relevant_keys:
             value = prompt_args.get(key)
             if isinstance(value, list):
-                # Sort lists to ensure consistent order for caching
-                try:
-                    key_data[key] = sorted(value)
-                except TypeError: # If list contains un-sortable items like dicts
-                    # For lists of dicts (e.g., intermediateStops), sort by a consistent key if possible
-                    if key == "intermediateStops" and value and isinstance(value[0], dict):
-                         try:
-                            key_data[key] = sorted(value, key=lambda x: (x.get('destination',''), x.get('startDate','')))
-                         except TypeError:
-                            key_data[key] = value # Fallback if sorting dicts fails
-                    else:
-                        key_data[key] = value 
+                # Sort lists for consistent hashing
+                key_data[key] = sorted(value) if value else []
             else:
                 key_data[key] = value
         
-        # Include provider in cache key to differentiate between providers
         key_data["provider"] = self.provider
         
         # Convert to a stable string representation
         return hashlib.sha256(json.dumps(key_data, sort_keys=True).encode()).hexdigest()
+
+    def _generate_activity_cache_key(self, original_activity: dict, custom_preferences: str, activity_type: str, is_meal: bool) -> str:
+        """Generate cache key for activity refresh to avoid redundant API calls"""
+        cache_data = {
+            "original_location": original_activity.get('location', ''),
+            "original_time": original_activity.get('time', ''),
+            "custom_preferences": custom_preferences,
+            "activity_type": activity_type,
+            "is_meal": is_meal,
+            "provider": self.provider
+        }
+        return hashlib.sha256(json.dumps(cache_data, sort_keys=True).encode()).hexdigest()
     
     def set_provider(self, provider: Literal["openai", "deepseek"]):
         """Change the AI provider"""
@@ -124,29 +226,8 @@ class AIClient:
         # Only reinitialize if the provider is changing
         if provider != self.provider:
             logger.info(f"Changing provider from {self.provider} to {provider}")
-            self.provider = provider
-            
-            # Set the appropriate API key based on provider
-            if self.provider == "openai":
-                self.api_key = os.getenv("OPENAI_API_KEY")
-                self.base_url = None  # Use default OpenAI base URL
-            else:  # deepseek
-                self.api_key = os.getenv("DS_OPENAI_API_KEY")
-                self.base_url = "https://api.deepseek.com/v1"
-            
-            # Reinitialize the client
-            self.client = AsyncOpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url
-            )
-            
-            # Set the appropriate model based on provider
-            self.model = self._get_default_model()
-            
-            # Clear cache for non-English languages to ensure language instructions are applied
-            language_code = trip_request.get('language', 'en')
-            if language_code != 'en':
-                self.clear_cache_for_language(language_code)
+            self._setup_provider(provider)
+            logger.info(f"Provider successfully changed to {self.provider} with model {self.model}")
     
     def _log_api_call(self, prompt_args: Dict[str, Any], is_cached: bool):
         """Log API call details"""
@@ -157,38 +238,6 @@ class AIClient:
             f"Cached: {is_cached}, "
             f"Args: {json.dumps({k: prompt_args.get(k) for k in ['destination', 'startDate', 'endDate', 'language']}, sort_keys=True)[:100]}..."
         )
-
-    def clear_cache_for_language(self, language_code: str):
-        """Clear cache for all trips in a specific language to force regeneration with language instructions"""
-        keys_to_remove = []
-        for key in self.cache.keys():
-            # Since cache keys are hashes, we need a different approach
-            # We'll clear all cache if the language is not English to be safe
-            pass
-        
-        # For non-English languages, clear entire cache to force regeneration
-        if language_code != 'en':
-            cache_size = len(self.cache)
-            self.cache.clear()
-            logger.info(f"[CACHE] Cleared entire cache ({cache_size} entries) for language '{language_code}' to force regeneration with language instructions")
-        else:
-            logger.info(f"[CACHE] No cache clearing needed for English language")
-
-    def clear_cache_for_destination(self, destination_pattern: str):
-        """Clear cache for trips matching a destination pattern"""
-        keys_to_remove = []
-        for key in self.cache.keys():
-            if destination_pattern.lower() in key.lower():
-                keys_to_remove.append(key)
-        
-        for key in keys_to_remove:
-            del self.cache[key]
-            logger.info(f"[CACHE] Cleared cache entry for destination pattern: {destination_pattern}")
-        
-        if keys_to_remove:
-            logger.info(f"[CACHE] Cleared {len(keys_to_remove)} cache entries for destination pattern: {destination_pattern}")
-        else:
-            logger.info(f"[CACHE] No cache entries found for destination pattern: {destination_pattern}")
 
     def clear_cache_for_request(self, trip_request: Dict[str, Any]):
         """Clear the cache for a specific trip request"""
@@ -219,24 +268,35 @@ class AIClient:
                 logger.warning(f"Model '{self.model}' is deprecated, using '{AI_CONFIG['default_model']}' instead")
                 self.model = self._get_default_model()
             
-            # Clear cache for non-English languages to ensure language instructions are applied
-            language_code = trip_request.get('language', 'en')
-            if language_code != 'en':
-                self.clear_cache_for_language(language_code)
-                
+            # CRITICAL FIX: Calculate expected_days BEFORE using it anywhere
+            expected_days = self._calculate_expected_days(trip_request)
+            logger.info(f"Calculated expected days: {expected_days}")
+            
             cache_key = self._generate_cache_key(trip_request)
             
             if cache_key in self.cache:
                 self._log_api_call(trip_request, is_cached=True)
                 cached_result = self.cache[cache_key]
                 
-                # Validate cached result for completeness
-                expected_days = self._calculate_expected_days(trip_request)
-                if len(cached_result.get('days', [])) >= expected_days:
+                # Smarter cache validation - check quality not just quantity
+                cached_days = len(cached_result.get('days', []))
+                if cached_days >= expected_days:
+                    # Validate that cached days have reasonable activity count
+                    total_activities = sum(len(day.get('activities', [])) for day in cached_result.get('days', []))
+                    avg_activities_per_day = total_activities / cached_days if cached_days > 0 else 0
+                    
+                    if avg_activities_per_day >= 2:  # At least 2 activities per day on average
+                        logger.info(f"[CACHE HIT] Using cached result with {cached_days} days, {total_activities} activities")
+                        return cached_result
+                    else:
+                        logger.warning(f"[CACHE QUALITY] Cached result has too few activities ({avg_activities_per_day:.1f} per day), regenerating")
+                        del self.cache[cache_key]
+                elif cached_days >= (expected_days * 0.8):  # If we have 80%+ of days, keep it
+                    logger.info(f"[CACHE PARTIAL] Using partially cached result ({cached_days}/{expected_days} days)")
                     return cached_result
                 else:
-                    logger.warning(f"[CACHE] Cached result incomplete ({len(cached_result.get('days', []))} vs {expected_days} days), regenerating")
-                    del self.cache[cache_key]  # Remove incomplete cached result
+                    logger.warning(f"[CACHE INCOMPLETE] Cached result too incomplete ({cached_days}/{expected_days} days), regenerating")
+                    del self.cache[cache_key]
             
             self._log_api_call(trip_request, is_cached=False)
             
@@ -246,44 +306,66 @@ class AIClient:
                 try:
                     # Generate different prompts for retry attempts
                     if attempt == 0:
-                        prompt = self._generate_prompt(trip_request)
-                        system_content = f"""You are a travel planning assistant. Your PRIMARY job is to complete ALL requested days.
+                        # First attempt: Detailed system message focused on quality
+                        system_content = f"""You are a travel planning expert. Generate a high-quality itinerary for {expected_days} days.
 
-🚨 CRITICAL: You MUST generate itineraries for ALL requested days. NEVER stop early.
-
-COMPLETION RULES:
-1. Count the requested days and provide exactly that many [DAY_START] blocks
-2. If running low on space, use shorter descriptions but COMPLETE ALL DAYS
-3. Each day needs minimum 3-4 activities, maximum detail within space limits
-4. NEVER truncate - better to have brief but complete days than detailed incomplete ones
+QUALITY FIRST: Focus on accuracy, detail, and user preference matching over forced completion.
 
 QUALITY STANDARDS:
-- Match user preferences and budget
-- Include specific place names and recommendations
-- Family-friendly considerations
-- Practical timing and logistics
+1. **Detailed Descriptions**: 2-3 sentences with specific details, insider tips, historical context
+2. **Precise Preference Matching**: Explain exactly how each activity matches user preferences: {', '.join(trip_request.get('entertainmentPreferences', []))}
+3. **Single Activity Types**: Use ONE type per activity from user preferences, never combine types
+4. **Mandatory Food Activities**: Include at least 1 dining activity per day (type "food")
+5. **Accurate Information**: Specific venue names, addresses, practical details
+6. **Budget Compliance**: Match {trip_request.get('budgetLevel', 'mid-range')} pricing expectations
+7. **Geographic Logic**: Ensure activities make geographic sense for the trip type
 
-SUCCESS = ALL days completed. FAILURE = Missing any day."""
+Generate as many complete days as possible within response limits. Quality over quantity."""
+                        prompt = self._generate_prompt(trip_request)
                     else:
-                        # More aggressive prompts for retries
-                        expected_days = self._calculate_expected_days(trip_request)
-                        prompt = self._generate_aggressive_retry_prompt(trip_request, attempt, expected_days)
-                        system_content = f"""⚠️ RETRY #{attempt + 1}: PREVIOUS INCOMPLETE!
+                        # Retry attempts: Focus on missing days with continued quality
+                        previous_days = self._get_previous_days_if_any(trip_request)
+                        previous_dates = [day.get('date') for day in previous_days]
+                        missing_days = expected_days - len(previous_days)
+                        
+                        # Generate list of all expected dates
+                        from datetime import datetime, timedelta
+                        start_date = datetime.strptime(trip_request.get('startDate'), '%Y-%m-%d')
+                        end_date = datetime.strptime(trip_request.get('endDate'), '%Y-%m-%d')
+                        all_dates = []
+                        current_date = start_date
+                        while current_date <= end_date:
+                            all_dates.append(current_date.strftime('%Y-%m-%d'))
+                            current_date += timedelta(days=1)
+                        
+                        # Find missing dates
+                        missing_dates = [date for date in all_dates if date not in previous_dates]
+                        
+                        system_content = f"""CONTINUATION GENERATION (Retry #{attempt + 1})
 
-🚨 YOU MUST COMPLETE ALL {expected_days} DAYS THIS TIME.
+CUMULATIVE STRATEGY: You are continuing a travel itinerary generation.
 
-MANDATORY:
-- Generate {expected_days} [DAY_START] blocks
-- Use shorter descriptions if needed
-- NEVER stop before completing all days
-- Focus on coverage over excessive detail
+ALREADY GENERATED: {len(previous_days)} days ({', '.join(previous_dates) if previous_dates else 'none'})
+NEED TO GENERATE: {len(missing_dates)} more days ({', '.join(missing_dates[:5])}{', ...' if len(missing_dates) > 5 else ''})
 
-THIS IS CRITICAL."""
+CRITICAL: Generate ONLY the missing dates. Do NOT regenerate existing dates.
+
+QUALITY STANDARDS:
+- Detailed 2-3 sentence descriptions with specific information
+- Accurate preference matching for: {', '.join(trip_request.get('entertainmentPreferences', []))}
+- Budget compliance: {trip_request.get('budgetLevel', 'mid-range')}
+- At least 1 food activity per day
+- Specific venue names and practical details
+
+Generate complete, accurate days for the missing dates only."""
+                        prompt = self._generate_quality_focused_retry_prompt(trip_request, attempt, expected_days)
 
                     logger.info(f"Sending request to {self.provider.upper()} with model {self.model} (attempt {attempt + 1}/{max_retries})")
-                    logger.debug(f"Prompt structure: { {key: type(val) for key, val in json.loads(prompt).items()} if isinstance(prompt,str) and prompt.startswith('{') else 'String prompt' }")
+                    logger.debug(f"Prompt structure: String prompt")
                     logger.info(f"System message length: {len(system_content)} chars")
                     logger.info(f"User prompt length: {len(prompt)} chars")
+
+                    _debug_log_prompts(attempt, system_content, prompt)
 
                     # The prompt from _generate_prompt is a single string, not system/user pair
                     # The old call_openai_api took a single prompt string and constructed messages.
@@ -295,12 +377,15 @@ THIS IS CRITICAL."""
                     # Get base model config and modify for retry attempts
                     model_config = get_model_config(self.model).copy()
                     if attempt > 0:
-                        # For retries, increase temperature slightly and reduce max_tokens significantly to force completion
-                        model_config['temperature'] = min(0.5, model_config.get('temperature', 0.3) + 0.1)
-                        model_config['max_tokens'] = 10000  # Significantly reduced to force shorter, complete responses
+                        # AGGRESSIVE RETRY: Respect DeepSeek 8192 token limit
+                        model_config['temperature'] = 0.2  # Low temperature for consistency but not too restrictive
+                        if self.provider == "deepseek":
+                            model_config['max_tokens'] = 6000  # Stay well under DeepSeek 8192 limit for retries
+                        else:
+                            model_config['max_tokens'] = 12000  # OpenAI can handle higher limits
                         logger.info(f"Retry attempt {attempt + 1}: Using temperature={model_config['temperature']}, max_tokens={model_config['max_tokens']}")
                     else:
-                        logger.info(f"First attempt: Using temperature={model_config.get('temperature', 0.3)}, max_tokens={model_config.get('max_tokens', 14000)}")
+                        logger.info(f"First attempt: Using temperature={model_config.get('temperature', 0.3)}, max_tokens={model_config.get('max_tokens', 8000 if self.provider == 'deepseek' else 16000)}")
 
                     response = await self.client.chat.completions.create(
                         model=self.model,
@@ -310,7 +395,7 @@ THIS IS CRITICAL."""
                                 "content": system_content
                             },
                             {
-                                "role": "user",
+                                "role": "user", 
                                 "content": user_content
                             }
                         ],
@@ -318,19 +403,28 @@ THIS IS CRITICAL."""
                     )
                     
                     if not response or not response.choices or not response.choices[0].message:
-                        raise ValueError("Invalid response structure from API")
+                        logger.error(f"Invalid response structure from {self.provider} API")
+                        logger.error(f"Response: {response}")
+                        raise ValueError(f"Invalid response structure from {self.provider} API")
                         
                     logger.info(f"Received response from {self.provider.upper()}")
-                    # logger.debug(f"Raw response: {response}") # Can be very verbose
                     
                     content = response.choices[0].message.content
                     if not content:
+                        logger.error(f"Empty content in response from {self.provider.upper()} API")
+                        logger.error(f"Full response: {response}")
                         raise ValueError(f"Empty content in response from {self.provider.upper()} API")
                     
                     logger.info(f"Response content length: {len(content)} characters")
                     logger.info(f"Response contains {content.count('[DAY_START]')} [DAY_START] blocks")
                     logger.info(f"Response contains {content.count('[DAY_END]')} [DAY_END] blocks")
+                    logger.debug(f"First 500 chars of response: {content[:500]}...")
                     
+                    _debug_log_response(attempt, content)
+                    
+                    # ENHANCED DEBUG LOGGING: Analyze response structure
+                    _debug_log_response_structure(content, expected_days)
+
                     # Enhanced token usage logging and storage
                     token_usage = None
                     if hasattr(response, 'usage') and response.usage:
@@ -343,14 +437,47 @@ THIS IS CRITICAL."""
                     else:
                         logger.warning("No token usage information available from API response")
                         
+                    # ENHANCED TOKEN ANALYSIS: Deep dive into token efficiency
+                    _debug_log_token_analysis(token_usage, self.model, self.provider, content)
+
                     itinerary = await self._process_response(content, trip_request)
                     
                     # Add token usage to the response if available
                     if token_usage:
                         itinerary['token_usage'] = token_usage
                     
-                    # Check if response is complete
-                    expected_days = self._calculate_expected_days(trip_request)
+                    # Check if processing returned an error response
+                    if not itinerary.get('success', True):  # Error responses have success: False
+                        logger.warning(f"[PROCESSING ERROR] {itinerary.get('error_type', 'unknown')}: {itinerary.get('message', 'Unknown error')}")
+                        
+                        # Extract partial data from error response for incomplete responses
+                        if itinerary.get('error_type') == 'incomplete_response' and itinerary.get('partial_data'):
+                            partial_data = itinerary.get('partial_data', {})
+                            partial_days = partial_data.get('days', [])
+                            if partial_days:
+                                # Store partial result for use in retries
+                                partial_cache_key = f"{cache_key}_partial_{attempt}"
+                                # Store just the days data for combination
+                                partial_result = {'days': partial_days, 'language': partial_data.get('language', 'en')}
+                                self.cache[partial_cache_key] = partial_result
+                                logger.info(f"[PARTIAL] Stored {len(partial_days)} days from incomplete response (attempt {attempt + 1})")
+                        
+                        if attempt < max_retries - 1:
+                            logger.info(f"[RETRY] Processing error, retrying attempt {attempt + 2}/{max_retries}")
+                            continue
+                        else:
+                            logger.error(f"[FINAL] All {max_retries} attempts had processing errors, checking if we can combine partial results")
+                            # Even though all attempts had "processing errors", we might have collected enough days
+                            combined_itinerary = self._combine_partial_results(trip_request, expected_days)
+                            if combined_itinerary.get('success', True) and len(combined_itinerary.get('days', [])) >= expected_days:
+                                logger.info(f"[SUCCESS] Despite processing errors, we collected all {len(combined_itinerary.get('days', []))} days from partial results!")
+                                self.cache[cache_key] = combined_itinerary
+                                return combined_itinerary
+                            else:
+                                logger.error(f"[FINAL] Could not combine enough days: {len(combined_itinerary.get('days', []))} out of {expected_days}")
+                                return itinerary
+                    
+                    # Check if response is complete (only for successful responses)
                     actual_days = len(itinerary.get('days', []))
                     
                     if actual_days >= expected_days:
@@ -360,19 +487,37 @@ THIS IS CRITICAL."""
                         self.cache[cache_key] = itinerary
                         return itinerary
                     else:
-                        logger.warning(f"[RETRY] Incomplete response: got {actual_days}/{expected_days} days on attempt {attempt + 1}")
-                        if token_usage:
-                            logger.warning(f"[RETRY] Wasted {token_usage['total_tokens']} tokens on incomplete response")
+                        # Store partial result for potential combination (only for successful responses)
+                        if actual_days > 0:
+                            partial_cache_key = f"{cache_key}_partial_{attempt}"
+                            self.cache[partial_cache_key] = itinerary
+                            logger.info(f"[PARTIAL] Stored {actual_days} days from attempt {attempt + 1}")
+                        
                         if attempt < max_retries - 1:
-                            logger.info(f"[RETRY] Retrying with attempt {attempt + 2}/{max_retries}")
+                            logger.info(f"[CONTINUE] Got {actual_days}/{expected_days} days on attempt {attempt + 1}, continuing for quality")
+                            # Try to combine with previous partial results if available
+                            combined_itinerary = self._combine_partial_results(trip_request, expected_days)
+                            if combined_itinerary.get('success', True) and len(combined_itinerary.get('days', [])) >= expected_days:
+                                logger.info(f"[SUCCESS] Combined partial results into complete itinerary")
+                                self.cache[cache_key] = combined_itinerary
+                                return combined_itinerary
                             continue
                         else:
-                            logger.error(f"[FINAL ATTEMPT] All {max_retries} attempts returned incomplete responses, using partial result")
-                            if token_usage:
-                                logger.error(f"[FINAL ATTEMPT] Total tokens used across all attempts: Check logs for sum")
-                            self.cache[cache_key] = itinerary
-                            return itinerary
-                    
+                            logger.info(f"[FINAL] Using best available result with {actual_days} days after {max_retries} attempts")
+                            # Try to combine all partial results
+                            combined_itinerary = self._combine_partial_results(trip_request, expected_days)
+                            if combined_itinerary.get('success', True) and len(combined_itinerary.get('days', [])) > actual_days:
+                                final_result = combined_itinerary
+                            else:
+                                # Create final error response for incomplete result
+                                final_result = self._create_error_response(
+                                    trip_request,
+                                    'incomplete_response',
+                                    f"After {max_retries} attempts, could only generate {actual_days} out of {expected_days} requested days.",
+                                    partial_data=itinerary
+                                )
+                            return final_result
+
                 except openai.APIError as api_error:
                     logger.error(f"{self.provider.upper()} API error during completions.create (attempt {attempt + 1}): {str(api_error)}")
                     if attempt < max_retries - 1:
@@ -390,10 +535,10 @@ THIS IS CRITICAL."""
             
         except ValueError as ve:
             logger.error(f"ValueError in generate_itinerary: {str(ve)}", exc_info=True)
-            return self._create_fallback_itinerary(trip_request)
+            return self._create_error_response(trip_request, 'generation_failed', str(ve))
         except Exception as e:
             logger.error(f"Error generating itinerary with {self.provider} model {self.model}: {str(e)}", exc_info=True) 
-            return self._create_fallback_itinerary(trip_request)
+            return self._create_error_response(trip_request, 'generation_failed', str(e))
 
     def _calculate_expected_days(self, trip_request: Dict[str, Any]) -> int:
         """Calculate the expected number of days for a trip"""
@@ -402,16 +547,57 @@ THIS IS CRITICAL."""
         end_date = datetime.strptime(trip_request.get('endDate'), '%Y-%m-%d')
         return (end_date - start_date).days + 1
 
+    def _get_previous_days_if_any(self, trip_request: Dict[str, Any]) -> list:
+        """Get any previously generated days from cache to avoid duplication"""
+        cache_key = self._generate_cache_key(trip_request)
+        all_previous_days = []
+        seen_dates = set()
+        
+        # Check main cache first
+        if cache_key in self.cache:
+            cached_result = self.cache[cache_key]
+            for day in cached_result.get('days', []):
+                date = day.get('date')
+                if date and date not in seen_dates:
+                    all_previous_days.append(day)
+                    seen_dates.add(date)
+        
+        # Check partial results from previous attempts
+        for attempt in range(3):  # max_retries = 3
+            partial_key = f"{cache_key}_partial_{attempt}"
+            if partial_key in self.cache:
+                partial_result = self.cache[partial_key]
+                for day in partial_result.get('days', []):
+                    date = day.get('date')
+                    if date and date not in seen_dates:
+                        all_previous_days.append(day)
+                        seen_dates.add(date)
+        
+        # Sort by date to maintain chronological order
+        all_previous_days.sort(key=lambda x: x.get('date', ''))
+        
+        if all_previous_days:
+            dates = [day.get('date') for day in all_previous_days]
+            logger.info(f"[PREVIOUS DAYS] Found {len(all_previous_days)} previously generated days: {dates}")
+        
+        return all_previous_days
+
     def _generate_prompt(self, args: Dict[str, Any]) -> str:
-        """Generate a prompt for the AI model.
-        This prompt is expected to be the 'user' part of the chat messages.
-        """
-        # Calculate expected number of days for validation
+        """Generate an efficient prompt with all critical logic preserved"""
+        # Calculate expected number of days
         from datetime import datetime, timedelta
         start_date = datetime.strptime(args.get('startDate'), '%Y-%m-%d')
         end_date = datetime.strptime(args.get('endDate'), '%Y-%m-%d')
         expected_days = (end_date - start_date).days + 1
         
+        # Format dates
+        date_list = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_list.append(current_date.strftime('%Y-%m-%d'))
+            current_date += timedelta(days=1)
+        dates_text = ', '.join(date_list)
+
         # Format intermediate stops if they exist
         intermediate_stops_text = ""
         if args.get('intermediateStops') and len(args.get('intermediateStops')) > 0:
@@ -425,162 +611,160 @@ THIS IS CRITICAL."""
                     stops.append(str(stop_data))
             intermediate_stops_text = f" via {', '.join(stops)}"
 
-        # Route-based geographic logic (works for any country)
-        destination = args.get('destination', 'Destination')
-        origin = args.get('origin', 'Origin')
-        if origin != 'Origin' and destination != 'Destination':
-            geographic_context = f"🗺️ ROUTE LOGIC: ALL activities must be along or near the route from {origin} to {destination}. Suggest activities that make geographic sense for travelers moving between these locations."
-        else:
-            geographic_context = f"🗺️ STAY NEAR {destination.upper()}: All activities must be within reasonable distance of {destination}."
-
-        # Generate date list for completion tracking
-        date_list = []
-        current_date = start_date
-        while current_date <= end_date:
-            date_list.append(current_date.strftime('%Y-%m-%d'))
-            current_date += timedelta(days=1)
-        dates_text = ', '.join(date_list)
-
-        # Language instruction mapping
-        language_code = args.get('language', 'en')
-        language_instructions = {
-            'en': 'RESPOND IN ENGLISH',
-            'es': 'RESPONDE EN ESPAÑOL (Spanish)',
-            'fr': 'RÉPONDEZ EN FRANÇAIS (French)', 
-            'de': 'ANTWORTEN SIE AUF DEUTSCH (German)',
-            'it': 'RISPONDI IN ITALIANO (Italian)',
-            'ru': 'ОТВЕЧАЙТЕ НА РУССКОМ ЯЗЫКЕ (Russian) - Все описания деятельности, местоположения и объяснения должны быть на русском языке',
-            'zh': '用中文回答 (Chinese) - All activity descriptions and explanations should be in Chinese'
-        }
+        # Geographic context - restored detailed logic
+        destination = args.get('destination', '').strip()
+        origin = args.get('origin', '').strip()
         
-        language_instruction = language_instructions.get(language_code, 'RESPOND IN ENGLISH')
+        if origin and origin.lower() != 'origin':
+            travel_mode = f"{args.get('travelType', 'trip')} from {origin} to {destination}"
+            geo_context = f"ROUTE MODE: Plan activities along {origin} → {destination} route. Include stops that make geographic sense for this journey."
+        else:
+            travel_mode = f"{args.get('travelType', 'trip')} to {destination}"
+            geo_context = f"DESTINATION MODE: ALL activities must be within reasonable distance of {destination} area."
 
-        prompt = f"""🎯 CRITICAL: Generate complete itinerary for ALL {expected_days} days: {dates_text}
+        # Traveler info
+        traveler_info = f"{args.get('adults', 2)} adults"
+        if args.get('children', 0) > 0:
+            traveler_info += f", {args.get('children', 0)} children"
+        if args.get('infants', 0) > 0:
+            traveler_info += f", {args.get('infants', 0)} infants"
 
-🌍 LANGUAGE REQUIREMENT: {language_instruction}
+        # Preferences with detailed hidden gems logic
+        preferences = args.get('entertainmentPreferences', [])
+        preferences_text = ', '.join(preferences) if preferences else 'general'
+        
+        # Detailed LOCAL focus for hidden gems - restored critical logic
+        local_focus = ""
+        if 'hidden-gems' in preferences:
+            local_focus = """HIDDEN GEMS - LOCAL FOCUS: Prioritize authentic LOCAL experiences:
+- LOCAL favorites: family-run businesses, neighborhood spots, LOCAL institutions
+- Places where LOCALS go - not tourist traps or chain establishments  
+- LOCAL markets, festivals, community centers, family restaurants
+- LOCAL-owned shops, artisan workshops, cultural venues
+- LOCAL neighborhoods where residents live and work
+- LOCAL traditions, customs, stories and history
+- Balance accessibility with LOCAL authenticity"""
 
-📍 Trip: {args.get('travelType', 'trip')} from {origin} to {destination}{intermediate_stops_text}
-👥 Travelers: {args.get('adults', 2)} adults, {args.get('children', 0)} children  
-💰 Budget: {args.get('budgetLevel', 'mid-range')}
-🎭 Preferences: {', '.join(args.get('entertainmentPreferences', []))}
+        prompt = f"""Generate a high-quality {expected_days}-day itinerary for {dates_text}
 
-{geographic_context}
+Trip: {travel_mode}{intermediate_stops_text}
+{traveler_info} | Budget: {args.get('budgetLevel', 'mid-range')}
+Preferences: {preferences_text}
+{geo_context}
+{local_focus}
 
-⚠️ COMPLETION REQUIREMENTS:
-- MUST include ALL {expected_days} days from {dates_text}
-- NEVER stop early or skip days
-- Each day needs 3-5 activities
-
-🚨 FILTER ACCURACY REQUIREMENTS (MANDATORY):
-- ALL activities MUST match user preferences: {', '.join(args.get('entertainmentPreferences', []))}
-- ALL activities MUST fit {args.get('budgetLevel', 'mid-range')} budget level
-- ALL activities MUST be suitable for {args.get('adults', 2)} adults + {args.get('children', 0)} children
+QUALITY REQUIREMENTS:
+- Target {expected_days} days: {dates_text}
+- 3-5 activities per day with detailed descriptions
+- MANDATORY: 1+ food activity daily (type "food")
+- ALL activities MUST match preferences: {preferences_text}
+- ALL activities MUST fit {args.get('budgetLevel', 'mid-range')} budget
+- ALL activities MUST suit traveler composition
 - NO activities that contradict user filters
+- 2-3 sentence descriptions with details, context, insider tips
+- Explain why each specifically matches {preferences_text} preferences
 
-📋 QUALITY RULES:
-1. **Elaborative Descriptions**: Write comprehensive 3-4 sentence descriptions that thoroughly explain the activity. Include specific details, insider tips, what makes this unique, historical context, practical information, and what visitors will experience. Be detailed and informative.
-2. **Elaborative "Why" Explanations**: Provide detailed explanations of exactly how each activity aligns with user preferences ({', '.join(args.get('entertainmentPreferences', []))}) and budget ({args.get('budgetLevel', 'mid-range')}). Explain comprehensively why this fits their travel style, family needs, and specific interests.
-3. **Precise Location Names**: Include exact venue names, addresses, and landmarks (coordinates no required)
-4. **Cultural Context**: Add historical significance, local insights, or unique features that elevate the experience
-5. **Practical Info**: Include timing, difficulty, age-appropriateness, duration, and insider knowledge
-6. **Specific Names**: Use actual restaurant names, tour operators, exact addresses when possible
-7. **Budget Compliance**: Match {args.get('budgetLevel', 'mid-range')} pricing expectations with specific cost insights
-8. **Route Logic**: Activities should make geographic sense along the travel route
-
-🏗️ FORMAT (use exact structure):
-[DAY_START]
-Date: YYYY-MM-DD
-
-[ACTIVITY_START]
-Time: HH:MM - HH:MM
-Type: travel/food/sightseeing/activity/accommodation
-Price: free/$/$$/$$$ 
-Location: Specific venue name, City, State/Province
-Description: Write an elaborative, comprehensive description that thoroughly covers what this activity entails. Include specific details about what visitors will see, do, and experience. Mention unique features, historical context, local significance, and practical insights. Provide insider tips, best times to visit, what to expect, and detailed information that helps travelers understand the full value and appeal of this activity.
-Why: Provide an elaborative explanation that comprehensively details how this activity specifically matches the user's {', '.join(args.get('entertainmentPreferences', []))} preferences, suits their {args.get('budgetLevel', 'mid-range')} budget, accommodates {args.get('adults', 2)} adults and {args.get('children', 0)} children, and enhances their {args.get('travelType', 'trip')} experience. Be thorough in explaining the connections to their filters and requirements.
-[ACTIVITY_END]
-
-[DAY_END]
-
-🎯 SUCCESS = ALL {expected_days} days completed with filter-accurate, elaborative content"""
-
-        # TODO: Deprecated Coordinates June 2025 - coordinates no longer included in prompt
-        # Old code: 2. **Precise Coordinates Required**: Include accurate coordinates for every location: "coordinates": {{"latitude": X.XXXX, "longitude": -X.XXXX}}. Use exact coordinates for landmarks, attractions, and specific businesses - NOT approximate city coordinates.
-
-        return prompt
-
-    def _generate_aggressive_retry_prompt(self, args: Dict[str, Any], attempt: int, expected_days: int) -> str:
-        """Generate a focused retry prompt that prioritizes completion with essential quality"""
-        from datetime import datetime, timedelta
-        start_date = datetime.strptime(args.get('startDate'), '%Y-%m-%d')
-        end_date = datetime.strptime(args.get('endDate'), '%Y-%m-%d')
-        
-        # Generate list of all expected dates
-        date_list = []
-        current_date = start_date
-        while current_date <= end_date:
-            date_list.append(current_date.strftime('%Y-%m-%d'))
-            current_date += timedelta(days=1)
-        
-        # Extract destination for geographic enforcement
-        destination = args.get('destination', 'Destination')
-        origin = args.get('origin', 'Origin')
-        if origin != 'Origin' and destination != 'Destination':
-            geographic_context = f"🗺️ STAY ON ROUTE: {origin} → {destination}!"
-        else:
-            geographic_context = f"🗺️ STAY NEAR {destination.upper()}!"
-
-        urgency_level = ["🔥 URGENT", "🚨 CRITICAL", "⚠️ FINAL ATTEMPT"][min(attempt-1, 2)]
-        
-        # Language instruction mapping
-        language_code = args.get('language', 'en')
-        language_instructions = {
-            'en': 'RESPOND IN ENGLISH',
-            'es': 'RESPONDE EN ESPAÑOL',
-            'fr': 'RÉPONDEZ EN FRANÇAIS', 
-            'de': 'ANTWORTEN SIE AUF DEUTSCH',
-            'it': 'RISPONDI IN ITALIANO',
-            'ru': 'ОТВЕЧАЙТЕ НА РУССКОМ ЯЗЫКЕ',
-            'zh': '用中文回答'
-        }
-        
-        language_instruction = language_instructions.get(language_code, 'RESPOND IN ENGLISH')
-        
-        # Retry with emphasis on both completion AND coordinates
-        retry_prompt = f"""{urgency_level}: Generate ALL {expected_days} days: {', '.join(date_list)}
-
-🌍 LANGUAGE: {language_instruction}
-
-{geographic_context}
-👥 {args.get('adults', 2)} adults + {args.get('children', 0)} children | 💰 {args.get('budgetLevel', 'mid-range')}
-🎭 Preferences: {', '.join(args.get('entertainmentPreferences', []))}
-
-📋 MANDATORY:
-- ALL {expected_days} days required: {', '.join(date_list)}
-- MUST match user filters: {', '.join(args.get('entertainmentPreferences', []))}
-- MUST fit {args.get('budgetLevel', 'mid-range')} budget
-- Include specific venue names and exact addresses
-- Elaborative descriptions and why explanations
-- COMPLETE coverage first, quality second
+TYPE RULES:
+- Use ONLY ONE type per activity from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
+- NEVER combine types (NO "outdoor, family-friendly" - choose ONE)
+- Prioritize user preferences: {preferences_text}
 
 FORMAT:
 [DAY_START]
 Date: YYYY-MM-DD
-[ACTIVITY_START]  
+[ACTIVITY_START]
 Time: HH:MM - HH:MM
-Type: travel/food/activity/sightseeing
+Type: ONE type only
 Price: free/$/$$/$$$ 
-Location: Venue name, City, State
-Description: Elaborative description with comprehensive details, insider tips, historical context, and specific information about what visitors will experience. Be thorough and informative.
-Why: Elaborative explanation of how this activity specifically matches {', '.join(args.get('entertainmentPreferences', []))} preferences, fits {args.get('budgetLevel', 'mid-range')} budget, and suits family composition ({args.get('adults', 2)} adults + {args.get('children', 0)} children). Be comprehensive.
+Location: Specific venue name, City
+Description: 2-3 sentences with details, historical context, practical tips
+Why: How this specifically matches {preferences_text} and {args.get('budgetLevel', 'mid-range')} budget
 [ACTIVITY_END]
 [DAY_END]
 
-✅ SUCCESS = {expected_days} complete days with filter-accurate, elaborative content"""
+Focus on quality and accuracy. Generate as many complete days as possible within response limits."""
 
-        # TODO: Deprecated Coordinates June 2025 - coordinates no longer requested in retry prompt
-        # Old code: - Include precise coordinates for every location (not approximate city coordinates)
-        # Old code: Coordinates: latitude, longitude
+        return prompt
+
+    def _generate_quality_focused_retry_prompt(self, args: Dict[str, Any], attempt: int, expected_days: int) -> str:
+        """Generate retry prompt focused on quality and continuation rather than forced completion"""
+        from datetime import datetime, timedelta
+        start_date = datetime.strptime(args.get('startDate'), '%Y-%m-%d')
+        end_date = datetime.strptime(args.get('endDate'), '%Y-%m-%d')
+        
+        # Get already generated days to avoid duplication
+        previous_days = self._get_previous_days_if_any(args)
+        generated_dates = [day.get('date') for day in previous_days]
+        
+        # Generate all required dates
+        all_dates = []
+        current_date = start_date
+        while current_date <= end_date:
+            all_dates.append(current_date.strftime('%Y-%m-%d'))
+            current_date += timedelta(days=1)
+        
+        # Identify missing dates
+        missing_dates = [date for date in all_dates if date not in generated_dates]
+        
+        # Geographic context
+        destination = args.get('destination', '').strip()
+        origin = args.get('origin', '').strip()
+        
+        if origin and origin.lower() != 'origin':
+            geo_context = f"ROUTE: Activities along {origin} → {destination} journey"
+        else:
+            geo_context = f"DESTINATION: Activities near {destination} only"
+
+        # Preferences with hidden gems focus
+        preferences = args.get('entertainmentPreferences', [])
+        preferences_text = ', '.join(preferences) if preferences else 'general'
+        
+        local_note = "Focus on authentic LOCAL experiences where LOCALS go" if 'hidden-gems' in preferences else ""
+        
+        # Traveler info
+        traveler_info = f"{args.get('adults', 2)} adults"
+        if args.get('children', 0) > 0:
+            traveler_info += f" + {args.get('children', 0)} children"
+
+        if missing_dates:
+            # Limit to first 5 missing dates to avoid overwhelming the AI
+            dates_to_generate = missing_dates[:5]
+            continuation_text = f"GENERATE THESE SPECIFIC DATES ONLY: {', '.join(dates_to_generate)}"
+            
+            if len(missing_dates) > 5:
+                continuation_text += f"\n(Focus on first {len(dates_to_generate)} dates. Do NOT generate all {len(missing_dates)} missing dates in one response.)"
+        else:
+            continuation_text = f"ERROR: No missing dates found. All {expected_days} days already generated: {', '.join(all_dates)}"
+
+        retry_prompt = f"""{continuation_text}
+
+{geo_context} | {traveler_info} | {args.get('budgetLevel', 'mid-range')}
+Preferences: {preferences_text}
+{local_note}
+
+CONTINUATION RULES:
+- Generate ONLY the specific dates listed above
+- Do NOT regenerate any existing dates: {', '.join(generated_dates) if generated_dates else 'none generated yet'}
+- Match user preferences: {preferences_text}
+- Fit budget: {args.get('budgetLevel', 'mid-range')}
+- Include 1+ food activity daily (type "food")
+- 2-3 sentence descriptions with specific details
+- ONE type per activity only
+
+FORMAT (Use exact dates specified above):
+[DAY_START]
+Date: YYYY-MM-DD (from the specific dates list above)
+[ACTIVITY_START]
+Time: HH:MM - HH:MM
+Type: ONE from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
+Price: free/$/$$/$$$ 
+Location: Specific venue name, City
+Description: 2-3 sentences with details, context, tips
+Why: How this matches {preferences_text} and budget
+[ACTIVITY_END]
+[DAY_END]
+
+CRITICAL: Only generate the specific dates requested. Quality over quantity."""
 
         return retry_prompt
 
@@ -590,41 +774,11 @@ Why: Elaborative explanation of how this activity specifically matches {', '.joi
         RE_DAY_DATE = re.compile(r'Date: (\d{4}-\d{2}-\d{2})')
         RE_ACTIVITY_BLOCKS = re.compile(r'(\[ACTIVITY_START\].*?(?=\n\s*\[ACTIVITY_START\]|\n\s*\[DAY_END\]|$))', re.DOTALL)
         RE_TIME = re.compile(r'Time:\s*(.+?)\n')
-        RE_TYPE = re.compile(r'Type:\s*(travel|food|activity|sightseeing|accommodation|lunch)\s*\n', re.IGNORECASE)
+        RE_TYPE = re.compile(r'Type:\s*([^,\n]+)(?:,.*?)?\s*\n', re.IGNORECASE)  # Captures first type before comma or newline
         RE_PRICE = re.compile(r'Price:\s*(free|\$|\$\$|\$\$\$)\s*\n', re.IGNORECASE)
-        RE_LOCATION = re.compile(r'Location:\s*(.*?)(?=\n\s*(?:Coordinates:|Why:|Price:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
-        RE_COORDINATES_TEXT = re.compile(r'Coordinates:\s*(.*?)(?=\n\s*(?:Why:|Price:|Location:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
-        RE_DESCRIPTION = re.compile(r'Description:\s*(.*?)(?=\n\s*(?:Why:|Price:|Location:|Coordinates:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
-        RE_WHY = re.compile(r'Why:\s*(.*?)(?=\n\s*(?:Price:|Location:|Coordinates:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
-
-        # Patterns for parsing coordinates string
-        COORDINATE_PATTERNS = [
-            re.compile(r'([+-]?\d+\.?\d*)\s*[°]?\s*[NSns]?,?\s*([+-]?\d+\.?\d*)\s*[°]?\s*[EWew]?', re.IGNORECASE),
-            re.compile(r'([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)'),
-            re.compile(r'([+-]?\d+\.?\d*)[^\d.,-]+([+-]?\d+\.?\d*)') # More general
-        ]
-
-        def parse_coordinates(coords_str: str) -> Optional[Dict[str, float]]:
-            # TODO: Deprecated Coordinates June 2025 - coordinate parsing function no longer used
-            return None
-            # if coords_str.lower() in ['n/a', 'not available', '']:
-            #     return None
-            # for pattern in COORDINATE_PATTERNS:
-            #     match = pattern.search(coords_str)
-            #     if match:
-            #         try:
-            #             lat = float(match.group(1))
-            #             lon = float(match.group(2))
-            #             if -90 <= lat <= 90 and -180 <= lon <= 180:
-            #                 # Additional validation: check if coordinates are reasonable for the destination
-            #                 destination = args.get('destination', '').lower()
-            #                 if not self._validate_coordinate_region(lat, lon, destination):
-            #                     logger.warning(f"Coordinates {lat}, {lon} seem inconsistent with destination '{destination}' - but allowing anyway")
-            #                 return {'latitude': lat, 'longitude': lon}
-            #         except (ValueError, IndexError, TypeError):
-            #             continue # Try next pattern
-            # logger.warning(f"Invalid or unparseable coordinates format: '{coords_str}'")
-            # return None
+        RE_LOCATION = re.compile(r'Location:\s*(.*?)(?=\n\s*(?:Why:|Price:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
+        RE_DESCRIPTION = re.compile(r'Description:\s*(.*?)(?=\n\s*(?:Why:|Price:|Location:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
+        RE_WHY = re.compile(r'Why:\s*(.*?)(?=\n\s*(?:Price:|Location:|Description:|Type:|Time:|\[ACTIVITY_END\]|$))', re.DOTALL | re.IGNORECASE)
 
         try:
             # Calculate expected number of days for validation
@@ -659,29 +813,37 @@ Why: Elaborative explanation of how this activity specifically matches {', '.joi
                      
                 for activity_text_match in activity_blocks:
                     activity_text = activity_text_match if isinstance(activity_text_match, str) else activity_text_match[0]
-                    # TODO: Deprecated Activity ID June 2025 - activity ID generation no longer needed
-                    # activity_data = {'id': f"{day_dict['date']}-{uuid.uuid4()}"}
                     activity_data = {}
                     
                     time_match = RE_TIME.search(activity_text)
                     activity_data['time'] = time_match.group(1).strip() if time_match else "Time not specified"
                     
                     type_match = RE_TYPE.search(activity_text)
-                    activity_type_str = type_match.group(1).lower() if type_match else 'activity'
-                    activity_data['type'] = 'food' if activity_type_str == 'lunch' else activity_type_str
+                    if type_match:
+                        raw_type = type_match.group(1).strip().lower()
+                        # Normalize type to preference-based categories
+                        type_mapping = {
+                            'lunch': 'food',
+                            'dining': 'food', 
+                            'restaurant': 'food',
+                            'meal': 'food',
+                            'sightseeing': 'must-see',
+                            'attraction': 'must-see',
+                            'landmark': 'must-see',
+                            'activity': 'outdoor',  # Default fallback
+                            'accommodation': 'travel',
+                            'travel': 'travel'
+                        }
+                        activity_type_str = type_mapping.get(raw_type, raw_type)
+                    else:
+                        activity_type_str = 'activity'
+                    activity_data['type'] = activity_type_str
                     
                     price_match = RE_PRICE.search(activity_text)
                     activity_data['price'] = price_match.group(1) if price_match else '$$'
                     
                     location_match = RE_LOCATION.search(activity_text)
                     activity_data['location'] = location_match.group(1).strip() if location_match else "Location not specified"
-                    
-                    # TODO: Deprecated Coordinates June 2025 - coordinate parsing no longer performed
-                    # coords_match_text = RE_COORDINATES_TEXT.search(activity_text)
-                    # if coords_match_text:
-                    #     parsed_coords = parse_coordinates(coords_match_text.group(1).strip())
-                    #     if parsed_coords:
-                    #         activity_data['coordinates'] = parsed_coords
                     
                     desc_match = RE_DESCRIPTION.search(activity_text)
                     activity_data['description'] = desc_match.group(1).strip() if desc_match else "No description provided."
@@ -713,187 +875,349 @@ Why: Elaborative explanation of how this activity specifically matches {', '.joi
                 logger.error(f"[INCOMPLETE RESPONSE] Received dates: {received_dates}")
                 logger.error(f"[INCOMPLETE RESPONSE] Missing dates: {list(missing_dates)}")
                 
-                # For now, return what we have and let the fallback handle the missing days
-                # In future iterations, we could implement retry logic here
-                if len(days) == 0:
-                    raise ValueError(f"No valid days found in AI response")
-                else:
-                    logger.warning(f"[INCOMPLETE RESPONSE] Returning partial itinerary with {len(days)} out of {expected_days} days")
+                # Return warning response with partial data instead of proceeding
+                partial_itinerary = {'days': days, 'language': args.get('language', 'en')}
+                return self._create_error_response(
+                    args, 
+                    'incomplete_response', 
+                    f"AI generated only {len(days)} out of {expected_days} requested days. This often happens with longer trips due to token limits.",
+                    partial_data=partial_itinerary
+                )
 
             logger.info(f"[DEBUG] Successfully processed {len(days)} days out of {expected_days} expected")
             
             return {
+                'success': True,
                 'days': days,
                 'language': args.get('language', 'en')
             }
 
         except Exception as e:
             logger.error(f"Error processing AI response: {str(e)}", exc_info=True)
-            return self._create_fallback_itinerary(args)
+            return self._create_error_response(args, 'processing_error', str(e))
 
     def _validate_response(self, response: str, args: Dict[str, Any]) -> bool:
-        """Validate the response format and content.
-        Returns True if valid, False otherwise.
-        """
+        """Validate the response format and content. Returns True if valid, False otherwise."""
         try:
+            logger.info(f"[VALIDATION DEBUG] === STARTING RESPONSE VALIDATION ===")
+            logger.info(f"[VALIDATION DEBUG] Response length: {len(response)} characters")
+            
             if not response.strip():
-                logger.error("Validation failed: AI response is empty.")
+                logger.error("[VALIDATION DEBUG] AI response is empty.")
                 return False
 
             required_tags = ['[DAY_START]', '[ACTIVITY_START]']
-            if not all(tag in response for tag in required_tags):
-                logger.error(f"Validation failed: Missing one or more required tags: {required_tags} in response.")
+            missing_tags = [tag for tag in required_tags if tag not in response]
+            if missing_tags:
+                logger.error(f"[VALIDATION DEBUG] Missing required tags: {missing_tags}")
+                logger.error(f"[VALIDATION DEBUG] Available tags: {[tag for tag in required_tags if tag in response]}")
                 return False
             
-            if not re.search(r'Date: \d{4}-\d{2}-\d{2}', response):
-                logger.error("Validation failed: No valid 'Date: YYYY-MM-DD' found in response.")
+            logger.info(f"[VALIDATION DEBUG] Found required tags: {required_tags}")
+            
+            # Check for date pattern
+            date_pattern = r'Date: \d{4}-\d{2}-\d{2}'
+            date_matches = re.findall(date_pattern, response)
+            if not date_matches:
+                logger.error("[VALIDATION DEBUG] No valid 'Date: YYYY-MM-DD' found in response.")
+                logger.error(f"[VALIDATION DEBUG] Looking for pattern: {date_pattern}")
+                # Show first 500 chars to see what format we actually got
+                logger.error(f"[VALIDATION DEBUG] First 500 chars: {response[:500]}")
                 return False
+            else:
+                logger.info(f"[VALIDATION DEBUG] Found {len(date_matches)} valid dates: {date_matches}")
 
             try:
                 target_language = args.get('language', 'en')
+                logger.info(f"[VALIDATION DEBUG] Target language: {target_language}")
+                
                 if target_language == 'en':
+                    logger.info(f"[VALIDATION DEBUG] English language validation - passed")
                     return True
 
                 desc_samples = re.findall(r'Description:\s*(.*?)(?=\n\s*(?:Why:|$))', response, re.DOTALL | re.IGNORECASE)
                 sample_text = ' '.join(s.strip() for s in desc_samples if s.strip())[:500]
+                
+                logger.info(f"[VALIDATION DEBUG] Description samples found: {len(desc_samples)}")
+                logger.info(f"[VALIDATION DEBUG] Sample text length: {len(sample_text)}")
                 
                 if sample_text:
                     detected_lang = detect(sample_text)
                     lang_map = {'en': ['en'], 'es': ['es'], 'fr': ['fr'], 'de': ['de'], 'it': ['it'], 'ru': ['ru'], 'zh': ['zh-cn', 'zh-tw']}
                     
                     expected_langs = lang_map.get(target_language, [target_language])
+                    logger.info(f"[VALIDATION DEBUG] Language detection - detected: {detected_lang}, expected: {expected_langs}")
+                    
                     if detected_lang not in expected_langs:
-                        logger.warning(f"Potential language mismatch. Expected {target_language} (one of {expected_langs}), detected {detected_lang} in sample.")
-                # else:
-                #     logger.info("No description text found for language validation or target is English.")
+                        logger.warning(f"[VALIDATION DEBUG] Language mismatch. Expected {target_language} (one of {expected_langs}), detected {detected_lang}")
+                    else:
+                        logger.info(f"[VALIDATION DEBUG] Language validation passed")
+                else:
+                    logger.warning(f"[VALIDATION DEBUG] No sample text available for language detection")
+                    
             except Exception as lang_e:
-                logger.warning(f"Language detection failed during validation: {str(lang_e)}")
+                logger.warning(f"[VALIDATION DEBUG] Language detection failed: {str(lang_e)}")
 
+            logger.info(f"[VALIDATION DEBUG] === VALIDATION PASSED ===")
             return True
 
         except Exception as e:
-            logger.error(f"Unexpected error during response validation: {str(e)}", exc_info=True)
+            logger.error(f"[VALIDATION DEBUG] Unexpected error during validation: {str(e)}", exc_info=True)
             return False
             
-    def _create_fallback_itinerary(self, trip_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a fallback itinerary when the AI response cannot be parsed or generation fails"""
-        logger.warning(f"Creating fallback itinerary for request to: {trip_data.get('destination', 'Unknown')}")
+    def _create_error_response(self, trip_data: Dict[str, Any], error_type: str, message: str, partial_data: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Create proper error/warning response instead of misleading fallback itinerary"""
+        logger.error(f"Creating {error_type} response for {trip_data.get('destination', 'Unknown')}: {message}")
+        
+        response = {
+            'success': False,
+            'error_type': error_type,  # 'generation_failed', 'incomplete_response', 'processing_error'
+            'message': message,
+            'destination': trip_data.get('destination', 'Unknown'),
+            'language': trip_data.get('language', 'en'),
+            'requested_days': self._calculate_expected_days(trip_data),
+            'partial_data': partial_data or {}
+        }
+        
+        # Add specific guidance based on error type
+        if error_type == 'generation_failed':
+            response['suggestions'] = [
+                'Try selecting different entertainment preferences',
+                'Consider a shorter trip duration',
+                'Try a different destination',
+                'Check if the destination name is spelled correctly'
+            ]
+        elif error_type == 'incomplete_response':
+            response['suggestions'] = [
+                'Try reducing the trip duration',
+                'Simplify entertainment preferences',
+                'Use a more popular destination',
+                'Try generating again - sometimes it works on retry'
+            ]
+            if partial_data and partial_data.get('days'):
+                response['partial_days_received'] = len(partial_data['days'])
+        elif error_type == 'processing_error':
+            response['suggestions'] = [
+                'Please try again in a few moments',
+                'Check your internet connection',
+                'If the problem persists, contact support'
+            ]
+        
+        return response
+
+    async def refresh_activity_suggestion(
+        self,
+        original_activity: dict,
+        custom_preferences: str,
+        activity_type: str,
+        is_meal: bool
+    ) -> Dict[str, Any]:
+        """
+        Generates a new activity suggestion to replace an existing one, using AI.
+        Now includes caching to reduce redundant API calls.
+        """
         try:
-            start_date_str = trip_data.get('startDate', datetime.now().strftime('%Y-%m-%d'))
-            end_date_str = trip_data.get('endDate', (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'))
+            # Check cache first to avoid redundant API calls
+            cache_key = self._generate_activity_cache_key(original_activity, custom_preferences, activity_type, is_meal)
             
-            try:
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-            except ValueError:
-                logger.error(f"Invalid date format in fallback: {start_date_str} or {end_date_str}. Using defaults.")
-                start_date = datetime.now()
-                end_date = start_date + timedelta(days=1)
+            if cache_key in self.cache:
+                logger.info(f"[CACHE HIT] Using cached activity refresh result")
+                return self.cache[cache_key]
+            
+            logger.info(f"[CACHE MISS] Generating new activity via API call")
+            
+            prompt = f'''
+            Generate a new activity to replace:
+            {original_activity.get('description')}
+            
+            IMPORTANT: Use this EXACT format:
+            [ACTIVITY_START]
+            Time: {original_activity.get('time')}
+            Type: {activity_type}
+            Description: (new activity description)
+            Why: Explanation of why this activity is recommended
+            Price: free|$|$$|$$$
+            Location: Specific place name
+            [ACTIVITY_END]
 
-            days_count = (end_date - start_date).days + 1
-            
-            if days_count <= 0:
-                 logger.warning(f"Invalid date range for fallback: {start_date_str} to {end_date_str}. Defaulting to 1 day.")
-                 days_count = 1
-                 end_date = start_date
+            Rules:
+            1. Keep the same time slot: {original_activity.get('time')}
+            2. Keep similar type of activity and use the same responselanguage
+            3. Make it family-friendly and engaging
+            4. Include specific details and locations
+            5. For the Location field, provide the exact name of the place (restaurant, museum, park, etc.)
+            '''
 
-            itinerary = {"days": [], "language": trip_data.get('language', 'en')}
-            destination = trip_data.get('destination', 'Selected Destination')
+            if custom_preferences:
+                prompt += f'''
+            User's custom preferences: {custom_preferences}
+            '''
             
-            for i in range(days_count):
-                current_date_obj = start_date + timedelta(days=i)
-                current_date_str_fb = current_date_obj.strftime('%Y-%m-%d')
-                
-                activities = [
+            if 'hidden-gems' in custom_preferences.lower():
+                prompt += '''
+            HIDDEN GEMS FOCUS: Generate lesser-known, authentic local experiences:
+            - Avoid mainstream tourist spots
+            - Focus on local favorites with high ratings but low tourist traffic
+            - Include authentic neighborhood gems and family-run establishments
+            '''
+            
+            if is_meal:
+                prompt += '''
+            For meal activities, provide 2-3 specific restaurant options with brief descriptions
+            Format the description exactly like this: 
+            "Options include: 
+            1. Restaurant Name - Brief description of cuisine and ambiance. 
+            2. Restaurant Name - Brief description. 
+            3. Restaurant Name - Brief description."
+            
+            IMPORTANT: Make sure each numbered restaurant option is on its own line, and use proper spacing.
+            Do NOT split restaurant names across multiple lines.
+            '''
+
+            model_config = get_model_config(self.model)
+            logger.debug(f"AIClient: Refreshing activity with model {self.model}, provider {self.provider}")
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
                     {
-                        # TODO: Deprecated Activity ID June 2025 - activity ID generation no longer needed for fallback
-                        # "id": str(uuid.uuid4()), 
-                        "time": "10:00 AM - 12:00 PM", "type": "activity",
-                        "description": f"Explore {destination}", "location": destination,
-                        "price": "$$", "why": "Default exploration activity."
+                        "role": "system",
+                        "content": "You are a travel activity generator. Generate a single new activity using the exact format provided. It should be the same city as the original activity. For meal activities, always suggest 2-3 specific restaurant options with brief descriptions."
                     },
                     {
-                        # TODO: Deprecated Activity ID June 2025 - activity ID generation no longer needed for fallback
-                        # "id": str(uuid.uuid4()), 
-                        "time": "12:30 PM - 2:00 PM", "type": "food",
-                        "description": "Lunch at a local spot", "location": "Local Restaurant",
-                        "price": "$$", "why": "Enjoy a meal."
-                    },
-                    {
-                        # TODO: Deprecated Activity ID June 2025 - activity ID generation no longer needed for fallback
-                        # "id": str(uuid.uuid4()), 
-                        "time": "2:30 PM - 5:30 PM", "type": "sightseeing",
-                        "description": "Visit notable attractions", "location": destination,
-                        "price": "$$", "why": "Discover local sights."
+                        "role": "user",
+                        "content": prompt
                     }
-                ]
-                itinerary["days"].append({"date": current_date_str_fb, "activities": activities})
+                ],
+                **model_config
+            )
             
-            logger.info(f"Fallback itinerary created successfully with {len(itinerary['days'])} days.")
-            return itinerary
+            content = response.choices[0].message.content
+            logger.debug(f"AIClient: Raw AI response for refresh: {content}")
+            
+            lines = [line.strip() for line in content.split('\n') if line.strip()]
+            new_activity = {
+                'time': original_activity.get('time'),
+                'type': activity_type
+            }
+            
+            current_field = None
+            description_lines = []
+
+            for line in lines:
+                if line == "[ACTIVITY_START]" or line == "[ACTIVITY_END]":
+                    continue
+
+                if line.startswith('Time: '):
+                    new_activity['time'] = line.replace('Time: ', '').strip()
+                    current_field = None
+                elif line.startswith('Type: '):
+                    new_activity['type'] = line.replace('Type: ', '').strip().lower()
+                    current_field = None
+                elif line.startswith('Description: '):
+                    description_lines.append(line.replace('Description: ', '').strip())
+                    current_field = 'description'
+                elif line.startswith('Why: '):
+                    if description_lines and current_field == 'description':
+                         new_activity['description'] = "\n".join(description_lines)
+                         description_lines = []
+                    new_activity['why'] = line.replace('Why: ', '').strip()
+                    current_field = None
+                elif line.startswith('Price: '):
+                    if description_lines and current_field == 'description':
+                         new_activity['description'] = "\n".join(description_lines)
+                         description_lines = []
+                    new_activity['price'] = line.replace('Price: ', '').strip()
+                    current_field = None
+                elif line.startswith('Location: '):
+                    if description_lines and current_field == 'description':
+                         new_activity['description'] = "\n".join(description_lines)
+                         description_lines = []
+                    new_activity['location'] = line.replace('Location: ', '').strip()
+                    current_field = None
+                elif current_field == 'description':
+                    description_lines.append(line)
+                elif is_meal and re.match(r"^\d+\.", line) and description_lines and current_field == 'description':
+                    description_lines.append(line)
+
+            if description_lines:
+                new_activity['description'] = "\n".join(description_lines)
+
+            if not new_activity.get('description'):
+                logger.error("AIClient: No description generated for new activity during refresh.")
+                raise ValueError("No description generated for new activity")
+            
+            # Cache the result for future use
+            self.cache[cache_key] = new_activity
+            logger.info(f"[CACHE STORE] Cached activity refresh result")
+            
+            logger.info(f"AIClient: Successfully generated new activity: {json.dumps(new_activity, indent=2)}")
+            return new_activity
+
         except Exception as e:
-             logger.exception(f"Critical error creating fallback itinerary: {str(e)}")
-             return {"days": [], "language": trip_data.get('language', 'en'), "error": "Failed to create fallback itinerary due to an internal error."}
+            logger.error(f"AIClient: Error refreshing activity: {str(e)}", exc_info=True)
+            raise
 
-    def _validate_coordinate_region(self, latitude: float, longitude: float, destination: str) -> bool:
-        """
-        TODO: Deprecated Coordinates June 2025 - coordinate validation function no longer used
-        Validate if the given coordinates are reasonable for the destination region
-        """
-        return True  # Always return True since coordinates are deprecated
-        # try:
-        #     # Basic regional validation for major destinations
-        #     region_bounds = {
-        #         # United States (contiguous)
-        #         'usa': {'lat_min': 24.0, 'lat_max': 49.0, 'lon_min': -125.0, 'lon_max': -66.0},
-        #         'california': {'lat_min': 32.5, 'lat_max': 42.0, 'lon_min': -124.5, 'lon_max': -114.0},
-        #         'oregon': {'lat_min': 42.0, 'lat_max': 46.3, 'lon_min': -124.6, 'lon_max': -116.5},
-        #         'redding': {'lat_min': 40.4, 'lat_max': 40.7, 'lon_min': -122.5, 'lon_max': -122.2},
-        #         'portland': {'lat_min': 45.4, 'lat_max': 45.7, 'lon_min': -122.8, 'lon_max': -122.5},
-        #         'campbell': {'lat_min': 37.2, 'lat_max': 37.3, 'lon_min': -122.1, 'lon_max': -121.9},
-        #         
-        #         # Canada
-        #         'canada': {'lat_min': 41.7, 'lat_max': 83.1, 'lon_min': -141.0, 'lon_max': -52.6},
-        #         'british columbia': {'lat_min': 48.3, 'lat_max': 60.0, 'lon_min': -139.1, 'lon_max': -114.0},
-        #         'vancouver': {'lat_min': 49.2, 'lat_max': 49.3, 'lon_min': -123.3, 'lon_max': -123.0},
-        #         
-        #         # Europe
-        #         'france': {'lat_min': 41.3, 'lat_max': 51.1, 'lon_min': -5.1, 'lon_max': 9.6},
-        #         'italy': {'lat_min': 35.5, 'lat_max': 47.1, 'lon_min': 6.6, 'lon_max': 18.8},
-        #         'spain': {'lat_min': 35.2, 'lat_max': 43.8, 'lon_min': -9.3, 'lon_max': 4.3},
-        #         'germany': {'lat_min': 47.3, 'lat_max': 55.1, 'lon_min': 5.9, 'lon_max': 15.0},
-        #     }
-        #     
-        #     # Check against specific city/region bounds first
-        #     for region, bounds in region_bounds.items():
-        #         if region in destination:
-        #             if (bounds['lat_min'] <= latitude <= bounds['lat_max'] and 
-        #                 bounds['lon_min'] <= longitude <= bounds['lon_max']):
-        #                 return True
-        #             else:
-        #                 logger.warning(f"Coordinates {latitude}, {longitude} outside expected bounds for {region}")
-        #                 return False
-        #     
-        #     # If no specific region found, check broader regions
-        #     if any(term in destination for term in ['california', 'ca', 'oregon', 'or', 'usa', 'united states']):
-        #         bounds = region_bounds['usa']
-        #         return (bounds['lat_min'] <= latitude <= bounds['lat_max'] and 
-        #                bounds['lon_min'] <= longitude <= bounds['lon_max'])
-        #     
-        #     if any(term in destination for term in ['canada', 'british columbia', 'bc']):
-        #         bounds = region_bounds['canada']
-        #         return (bounds['lat_min'] <= latitude <= bounds['lat_max'] and 
-        #                bounds['lon_min'] <= longitude <= bounds['lon_max'])
-        #     
-        #     # Default to valid if we can't determine the region
-        #     return True
-        #     
-        # except Exception as e:
-        #     logger.warning(f"Error validating coordinates: {e}")
-        #     return True  # Default to valid if validation fails
+    def _combine_partial_results(self, trip_request: Dict[str, Any], expected_days: int) -> Dict[str, Any]:
+        """Combine partial results from multiple attempts to form a complete itinerary"""
+        from datetime import datetime, timedelta
+        
+        cache_key = self._generate_cache_key(trip_request)
+        combined_days = []
+        seen_dates = set()
+        
+        # Collect all partial results from attempts
+        for attempt in range(3):  # max_retries = 3
+            partial_key = f"{cache_key}_partial_{attempt}"
+            if partial_key in self.cache:
+                partial_result = self.cache[partial_key]
+                for day in partial_result.get('days', []):
+                    date = day.get('date')
+                    if date and date not in seen_dates:
+                        combined_days.append(day)
+                        seen_dates.add(date)
+                        logger.info(f"[COMBINE] Added day {date} from attempt {attempt}")
+        
+        # Sort days by date
+        combined_days.sort(key=lambda x: x.get('date', ''))
+        
+        # Generate expected dates for validation
+        start_date = datetime.strptime(trip_request.get('startDate'), '%Y-%m-%d')
+        end_date = datetime.strptime(trip_request.get('endDate'), '%Y-%m-%d')
+        expected_dates = []
+        current_date = start_date
+        while current_date <= end_date:
+            expected_dates.append(current_date.strftime('%Y-%m-%d'))
+            current_date += timedelta(days=1)
+        
+        # Check coverage
+        found_dates = [day.get('date') for day in combined_days]
+        missing_dates = set(expected_dates) - set(found_dates)
+        
+        logger.info(f"[COMBINE] Combined {len(combined_days)} days from partial results")
+        logger.info(f"[COMBINE] Expected: {len(expected_dates)} days, Found: {len(found_dates)} days")
+        
+        if missing_dates:
+            logger.info(f"[COMBINE] Missing dates: {sorted(missing_dates)}")
+        
+        if len(combined_days) > 0:
+            combined_result = {
+                'success': True,
+                'days': combined_days,
+                'language': trip_request.get('language', 'en'),
+                'partial_combination': True,
+                'missing_dates': sorted(missing_dates) if missing_dates else []
+            }
+            return combined_result
+        else:
+            logger.warning("[COMBINE] No partial results found to combine")
+            return self._create_error_response(trip_request, 'incomplete_response', "No valid days found in AI response")
 
-# Define what should be exported from this module if it were a library
-# For application use, this is less critical but good practice.
-__all__ = [
-    'AIClient',
-]
+    def _validate_day_quality(self, day: dict) -> bool:
+        """Ensure each day has minimum quality standards"""
+        activities = day.get('activities', [])
+        has_food = any(act.get('type') == 'food' for act in activities)
+        min_activities = len(activities) >= 3
+        return has_food and min_activities
+
+__all__ = ['AIClient']
+

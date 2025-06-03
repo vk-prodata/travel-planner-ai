@@ -24,7 +24,7 @@ class Settings(BaseModel):
     # JWT settings
     jwt_secret: str = os.getenv("JWT_SECRET", "your-super-secret-key-change-this-in-production")
     jwt_algorithm: str = "HS256"
-    jwt_expires_minutes: int = 60 * 24  # 24 hours
+    jwt_expires_minutes: int = 60 * 24 * 7  # 7 days (increased from 24 hours)
 
     # Stripe settings - Define fields but load conditionally
     stripe_secret_key: str = ""

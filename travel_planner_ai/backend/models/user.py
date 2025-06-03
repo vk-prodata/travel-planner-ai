@@ -8,6 +8,8 @@ class User(BaseModel):
     name: Optional[str] = None
     available_credits: int = 0
     total_credits_purchased: int = 0
+    google_refresh_token: Optional[str] = None  # Google OAuth refresh token
+    jwt_refresh_token: Optional[str] = None     # JWT refresh token
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     

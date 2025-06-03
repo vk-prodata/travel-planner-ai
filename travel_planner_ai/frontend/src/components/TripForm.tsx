@@ -503,6 +503,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
             </Form.Group>
 
             {/* Language */}
+            {/* DISABLED: Language selector hidden due to reliability issues
             <Form.Group className="mb-3">
               <Form.Label className="d-flex align-items-center">
                 Language
@@ -529,6 +530,7 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
                 <option value="zh">Chinese (中文)</option>
               </Form.Select>
             </Form.Group>
+            */}
 
             {/* AI Provider */}
             <Form.Group className="mb-3">

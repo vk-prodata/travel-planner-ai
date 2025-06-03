@@ -48,8 +48,9 @@ async def create_trip(
     users_collection = Depends(get_user_collection)
 ):
     try:
-        # Check if we need to deduct credits
-        user_id = current_user["id"]
+        # Check if we need to deduct credits - handle both 'id' and '_id' field names
+        user_id = current_user.get('id') or current_user.get('_id')
+        user_email = current_user.get('email', 'unknown')
         should_deduct_credits = True
         
         # If the trip already has an itinerary, assume credits were already deducted during itinerary generation
@@ -70,7 +71,7 @@ async def create_trip(
         
         logger.info(f"""
         Starting trip creation process:
-        - User: {current_user['email']} (ID: {user_id})
+        - User: {user_email} (ID: {user_id})
         - Destination: {trip.formData.get('destination')}
         - Date Range: {trip.formData.get('startDate')} to {trip.formData.get('endDate')}
         - Has Itinerary: {bool(trip.itinerary)}
@@ -155,7 +156,7 @@ async def create_trip(
         logger.info(f"""
         Creating new trip:
         - Trip ID: {trip_id}
-        - User: {current_user['email']} (ID: {user_id})
+        - User: {user_email} (ID: {user_id})
         - Destination: {trip_dict.get('formData', {}).get('destination')}
         - Created at: {trip_dict['created_at']}
         - Itinerary structure: {list(trip_dict.get('itinerary', {}).keys())}
@@ -190,7 +191,9 @@ async def get_user_trips(
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    if user_id != current_user['id']:
+    # Handle both 'id' and '_id' field names
+    current_user_id = current_user.get('id') or current_user.get('_id')
+    if user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Not authorized to view other users' trips")
     
     try:
@@ -222,6 +225,10 @@ async def update_trip(
     db = Depends(get_db)
 ):
     try:
+        # Handle both 'id' and '_id' field names
+        current_user_id = current_user.get('id') or current_user.get('_id')
+        user_email = current_user.get('email', 'unknown')
+        
         # Try to find by MongoDB _id first
         try:
             existing_trip = db.trips_collection.find_one({"_id": ObjectId(trip_id)})
@@ -232,13 +239,13 @@ async def update_trip(
         if not existing_trip:
             raise HTTPException(status_code=404, detail="Trip not found")
         
-        if existing_trip["user_id"] != current_user['id']:
+        if existing_trip["user_id"] != current_user_id:
             raise HTTPException(status_code=403, detail="Not authorized to update this trip")
         
         # Prepare update data with consistent ID fields
         update_data = trip.dict()
         update_data.update({
-            "user_id": current_user['id'],
+            "user_id": current_user_id,
             "id": existing_trip.get('id') or trip_id,
             "updated_at": datetime.now()
         })
@@ -251,7 +258,7 @@ async def update_trip(
         logger.info(f"""
         Updating trip:
         - Trip ID: {trip_id}
-        - User: {current_user['email']}
+        - User: {user_email}
         - Destination: {update_data.get('formData', {}).get('destination')}
         - Updated at: {update_data['updated_at']}
         - Itinerary changes: {update_data.get('itinerary')}
@@ -285,7 +292,10 @@ async def generate_itinerary(
     users_collection = Depends(get_user_collection)
 ):
     try:
-        logger.info(f"Generating itinerary for user {current_user['id']} ({current_user.get('email')})")
+        # Handle both 'id' and '_id' field names
+        user_id = current_user.get('id') or current_user.get('_id')
+        user_email = current_user.get('email', 'unknown')
+        logger.info(f"Generating itinerary for user {user_id} ({user_email})")
         
         # Log request data
         logger.info(f"Request data: {json.dumps(trip_request.formData, indent=2)}")
@@ -295,7 +305,6 @@ async def generate_itinerary(
         logger.info(f"Using AI provider: {ai_provider}")
         
         # Deduct credits based on trip days
-        user_id = current_user["id"]
         try:
             credits_result = deduct_credits_for_trip(users_collection, user_id, trip_request)
             logger.info(f"Credits deducted for itinerary generation. Remaining: {credits_result.get('available_credits', 'N/A')}")
@@ -308,7 +317,11 @@ async def generate_itinerary(
             # Force the AI client to use the specified provider
             ai_client.set_provider(ai_provider)
             
-            itinerary = await ai_client.generate_itinerary(trip_request.formData)
+            # Add userId to formData for cache key generation
+            form_data_with_user = trip_request.formData.copy()
+            form_data_with_user['userId'] = user_id
+            
+            itinerary = await ai_client.generate_itinerary(form_data_with_user)
             
             # Log raw AI response
             logger.debug(f"Raw AI response: {json.dumps(itinerary, indent=2)}")
@@ -317,10 +330,33 @@ async def generate_itinerary(
                 logger.error(f"Invalid AI response format: {itinerary}")
                 raise ValueError("Invalid response from AI service")
             
-            # Ensure the response has the correct structure
+            # Check if AI client returned an error response
+            if not itinerary.get('success', True):
+                logger.warning(f"AI generation warning/error: {itinerary.get('error_type')}: {itinerary.get('message')}")
+                return {
+                    "success": False,
+                    "error_type": itinerary.get('error_type'),
+                    "message": itinerary.get('message'),
+                    "suggestions": itinerary.get('suggestions', []),
+                    "destination": itinerary.get('destination'),
+                    "requested_days": itinerary.get('requested_days'),
+                    "partial_data": itinerary.get('partial_data', {}),
+                    "partial_days_received": itinerary.get('partial_days_received')
+                }
+            
+            # Ensure the response has the correct structure for successful responses
             if not itinerary.get('days'):
                 logger.error("No days found in itinerary")
-                raise ValueError("Invalid itinerary format: no days found")
+                return {
+                    "success": False,
+                    "error_type": "processing_error",
+                    "message": "AI generated response without any trip days",
+                    "suggestions": [
+                        "Try a different destination",
+                        "Simplify your preferences",
+                        "Try generating again"
+                    ]
+                }
 
             # Format each day's activities
             for day in itinerary['days']:
@@ -337,7 +373,7 @@ async def generate_itinerary(
                     # if not activity.get('id'):
                     #     activity['id'] = f"{day['date']}-{id(activity)}"
 
-            logger.info(f"Successfully formatted itinerary for {current_user.get('email')} using {ai_provider} provider")
+            logger.info(f"Successfully formatted itinerary for {user_email} using {ai_provider} provider")
             logger.debug(f"Final formatted itinerary: {json.dumps(itinerary, indent=2)}")
             
             # Add tripId and isOwner flag
@@ -353,7 +389,7 @@ async def generate_itinerary(
             logger.error(f"Error generating itinerary with {ai_provider} provider: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Dear {current_user.get('email')}, we encountered an error with {ai_provider} provider: {str(e)}"
+                detail=f"Dear {user_email}, we encountered an error with {ai_provider} provider: {str(e)}"
             )
 
     except HTTPException as he:
@@ -363,7 +399,7 @@ async def generate_itinerary(
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Dear {current_user.get('email')}, an unexpected error occurred"
+            detail=f"Dear {current_user.get('email', 'unknown')}, an unexpected error occurred"
         )
 
 @router.delete("/activities/{day_index}/{activity_index}")

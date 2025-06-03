@@ -1,11 +1,11 @@
 from typing import Dict
 
 AI_CONFIG = {
-    "default_model": "gpt-4o-2024-11-20", #"gpt-4o-2024-11-20",  # Using a stable model as default
+    "default_model": "gpt-4.1-2025-04-14", #"gpt-4o-2024-11-20",  # Using a stable model as default
     "deepseek_default_model": "deepseek-chat", # DeepSeek default model
     "models": {
-        "gpt-4o-2024-11-20vk": {
-            "max_tokens": 12000,
+        "gpt-4.1-2025-04-14": {
+            "max_tokens": 14000,
             "temperature": 0.3,
             "top_p": 0.9,
             "frequency_penalty": 0.1,
@@ -50,24 +50,24 @@ AI_CONFIG = {
         "gpt-4o-2024-11-20": {
             "temperature": 0.3,    # Low temperature for consistency and correctness in format (reduces hallucinations while keeping some creativity).
             "top_p": 1.0,          # Use full token distribution; primary randomness control via temperature.
-            "max_tokens": 14000,   # Reduced from 16000 to leave more room for output tokens - improves completion for longer itineraries.
+            "max_tokens": 16000,   # INCREASED: More tokens for longer, complete itineraries
             "frequency_penalty": 0.0,  # No repetition penalty (itineraries may naturally repeat structure like days of week).
             "presence_penalty": 0.0,   # No presence penalty (avoid forcing new/unrelated content; focus on relevant activities).
         },
-        # DeepSeek model configurations
+        # DeepSeek model configurations - FIXED FOR API LIMITS
         "deepseek-chat": {
-            "temperature": 0.4,    # Slightly higher than OpenAI for creativity while maintaining coherence
-            "top_p": 0.95,         # Slightly reduced nucleus sampling to maintain focus
-            "max_tokens": 8000,    # Increased from 6000 to handle longer itineraries
-            "frequency_penalty": 0.1,  # Small penalty to reduce repetition
-            "presence_penalty": 0.1,   # Small penalty to encourage diverse content
+            "temperature": 0.3,    # FIXED: Match OpenAI temperature for consistency
+            "top_p": 1.0,          # FIXED: Match OpenAI top_p for consistency
+            "max_tokens": 8000,    # FIXED: Stay under DeepSeek 8192 limit
+            "frequency_penalty": 0.0,  # FIXED: Match OpenAI for consistent quality
+            "presence_penalty": 0.0,   # FIXED: Match OpenAI for consistent quality
         },
         "deepseek-coder": {  # Alternative model with more structured output
-            "temperature": 0.3,    # Lower temperature for more consistent formatting
-            "top_p": 0.9,          # Further reduced for consistency
-            "max_tokens": 8000,    # Increased from 6000 to handle longer itineraries
-            "frequency_penalty": 0.2,  # Higher penalty to avoid repetitive suggestions
-            "presence_penalty": 0.0,   # No presence penalty to maintain focus
+            "temperature": 0.3,    # FIXED: Match primary models for consistency
+            "top_p": 1.0,          # FIXED: Match OpenAI configuration
+            "max_tokens": 8000,    # FIXED: Stay under DeepSeek 8192 limit
+            "frequency_penalty": 0.0,  # FIXED: Match OpenAI settings
+            "presence_penalty": 0.0,   # FIXED: Match OpenAI settings
         }
     }
 }

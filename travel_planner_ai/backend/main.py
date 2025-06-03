@@ -16,8 +16,10 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi import status
-
+from datetime import datetime
+from fastapi.responses import JSONResponse
 from .models.user import User, UserResponse
+from .services.jwt_service import jwt_service
 
 # Setup logging
 app_logger = setup_logging()
@@ -25,7 +27,7 @@ logger = logging.getLogger("travel_planner_ai.main")
 logger.info("Starting Travel Planner AI application")
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path="travel_planner_ai/.env")
 
 app = FastAPI(title="Travel Planner AI")
 
@@ -139,12 +141,13 @@ async def google_auth(
     users_collection = Depends(get_user_collection)
 ):
     """
-    Authenticate user with Google OAuth token and return user data
+    Authenticate user with Google OAuth token and return user data with JWT token
     """
     try:
         # Get token from request body
         body = await request.json()
         token = body.get('token')
+        refresh_token = body.get('refresh_token')
         
         if not token:
             raise HTTPException(
@@ -166,17 +169,45 @@ async def google_auth(
             user_data = user_data.model_dump()
         elif hasattr(user_data, 'dict'):
             user_data = user_data.dict()
+        
+        # Generate JWT tokens for longer sessions
+        user_id = user_data.get("id") or user_data.get("_id")
+        jwt_access_token = jwt_service.create_access_token(user_data)
+        jwt_refresh_token = jwt_service.create_refresh_token(user_id)
+        
+        # Store refresh tokens if provided
+        update_data = {"updated_at": datetime.now()}
+        if refresh_token:
+            update_data["google_refresh_token"] = refresh_token
+        update_data["jwt_refresh_token"] = jwt_refresh_token
+        
+        users_collection.update_one(
+            {"_id": user_id},
+            {"$set": update_data}
+        )
             
         logger.info(f"User data before response: {user_data}")
         
-        # Return user response
-        return UserResponse(
-            id=user_data.get("id") or user_data.get("_id"),  # Try both id and _id
+        # Return user response with JWT tokens
+        response = UserResponse(
+            id=user_id,
             email=user_data["email"],
             name=user_data["name"],
             available_credits=user_data.get("available_credits", 0),
             total_credits_purchased=user_data.get("total_credits_purchased", 0)
         )
+        
+        # Add JWT tokens to response headers
+        headers = {
+            "X-Access-Token": jwt_access_token,
+            "X-Refresh-Token": jwt_refresh_token
+        }
+        
+        return JSONResponse(
+            content=response.model_dump(),
+            headers=headers
+        )
+        
     except json.JSONDecodeError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -188,6 +219,46 @@ async def google_auth(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
+        )
+
+@app.post("/auth/refresh")
+async def refresh_token(
+    request: Request,
+    users_collection = Depends(get_user_collection)
+):
+    """
+    Refresh JWT access token using refresh token
+    """
+    try:
+        body = await request.json()
+        refresh_token = body.get('refresh_token')
+        
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Refresh token is required"
+            )
+        
+        # Generate new access token
+        new_access_token = jwt_service.refresh_access_token(refresh_token, users_collection)
+        
+        return {
+            "access_token": new_access_token,
+            "token_type": "bearer"
+        }
+        
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON in request body"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in refresh_token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to refresh token"
         )
 
 @app.get("/health")

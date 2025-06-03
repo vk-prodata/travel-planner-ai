@@ -271,6 +271,26 @@ const Itinerary: React.FC<ItineraryProps> = ({
 
   const tripInfo = formatTripInfo();
 
+  const getActivityTypeColor = (type: string) => {
+    const colorMap: {[key: string]: {bg: string, text: string, border?: string}} = {
+      'hidden-gems':     { bg: '#ffc107', text: '#000' },
+      'must-see':        { bg: '#0d6efd', text: '#fff' },
+      'family-friendly': { bg: '#198754', text: '#fff' },
+      'food':            { bg: '#fd7e14', text: '#000' },
+      'outdoor':         { bg: '#20c997', text: '#000' },
+      'cultural':        { bg: '#6f42c1', text: '#fff' },
+      'adventure':       { bg: '#dc3545', text: '#fff' },
+      'educational':     { bg: '#0dcaf0', text: '#000' },
+      'nightlife':       { bg: '#343a40', text: '#fff' },
+      'relaxation':      { bg: '#6c757d', text: '#fff' },
+      'sightseeing':     { bg: '#cfe2ff', text: '#000' }, // Light blue
+      'travel':          { bg: '#adb5bd', text: '#000' },
+      'activity':        { bg: '#f8f9fa', text: '#000', border: '1px solid #dee2e6' }, // Default light gray
+    };
+    
+    return colorMap[type.toLowerCase()] || colorMap['activity'];
+  };
+
   // Check if itinerary or itinerary.days is undefined
   if (!itinerary || !itinerary.days) {
     return (
@@ -395,7 +415,21 @@ const Itinerary: React.FC<ItineraryProps> = ({
                             <div className="d-flex justify-content-between align-items-center">
                               <div className="activity-time fw-bold">{activity.time}</div>
                               <div className="d-flex gap-2 align-items-center">
-                                <span className={`badge ${isMeal ? 'bg-success' : 'bg-light text-primary'}`}>
+                                <span 
+                                  className="badge"
+                                  style={{
+                                    background: getActivityTypeColor(activity.type).bg,
+                                    color: getActivityTypeColor(activity.type).text,
+                                    border: getActivityTypeColor(activity.type).border || 'none',
+                                    fontWeight: 'normal', // Simplified weight
+                                    fontSize: '0.75rem',
+                                    padding: '0.3rem 0.6rem',
+                                    borderRadius: '0.25rem', // Standard Bootstrap radius
+                                    minWidth: '80px',
+                                    textAlign: 'center',
+                                    display: 'inline-block'
+                                  }}
+                                >
                                   {activity.type}
                                 </span>
                                 {getPriceLevelDisplay(activity.price)}

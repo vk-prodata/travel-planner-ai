@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useSe
 import TripForm from './components/TripForm';
 import Itinerary from './components/Itinerary';
 import TripTitleExport from './components/TripTitleExport';
-import { TripFormData, TripItinerary, Activity } from './types';
+import { TripFormData, TripItinerary, Activity, User } from './types';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShareAlt, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
@@ -47,7 +47,7 @@ const UserAvatar: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-const ReadOnlyBanner: React.FC<{ isReadOnlyMode?: boolean }> = ({ isReadOnlyMode = true }) => {
+const ReadOnlyBanner: React.FC<{ isReadOnlyMode?: boolean; user: User | null }> = ({ isReadOnlyMode = true, user }) => {
   return (
     <div className="alert alert-info mb-4 d-flex justify-content-between align-items-center">
       <div>
@@ -57,7 +57,7 @@ const ReadOnlyBanner: React.FC<{ isReadOnlyMode?: boolean }> = ({ isReadOnlyMode
           <span><strong>Sign in</strong> to save your trips and access them later.</span>
         )}
       </div>
-      <AuthForm />
+      {!user && <AuthForm />}
     </div>
   );
 };
@@ -322,7 +322,26 @@ const MainApp = () => {
       }
     } catch (error: any) {
       console.error('Error generating trip:', error);
-      notifyError(error instanceof Error ? error.message : 'Failed to generate trip', user?.email);
+      
+      // Handle enhanced error responses from AI generation
+      if (error.errorType) {
+        let errorMessage = error.message;
+        
+        // Add specific guidance based on error type
+        if (error.errorType === 'incomplete_response' && error.partialDaysReceived) {
+          errorMessage += `\n\nPartial Result: Generated ${error.partialDaysReceived} out of ${error.requestedDays} requested days.`;
+        }
+        
+        // Add suggestions if available
+        if (error.suggestions && error.suggestions.length > 0) {
+          errorMessage += '\n\nSuggestions:\n• ' + error.suggestions.join('\n• ');
+        }
+        
+        notifyError(errorMessage, user?.email);
+      } else {
+        // Generic error handling for other types of errors
+        notifyError(error instanceof Error ? error.message : 'Failed to generate trip', user?.email);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -814,7 +833,7 @@ const MainApp = () => {
               ) : itinerary ? (
                 <div>
                   {(isReadOnlyMode || !user) && (
-                    <ReadOnlyBanner isReadOnlyMode={isReadOnlyMode} />
+                    <ReadOnlyBanner isReadOnlyMode={isReadOnlyMode} user={user} />
                   )}
                   <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
                     {isEditingTitle ? (
@@ -1099,7 +1118,7 @@ const MainApp = () => {
               ) : (
                 <div className="text-center py-1">
                   {!user && (
-                    <ReadOnlyBanner isReadOnlyMode={false} />
+                    <ReadOnlyBanner isReadOnlyMode={false} user={user} />
                   )}
                   <div className="bg-white p-5 rounded shadow-sm">
                     <h3 className="text-primary-dark mb-3">Plan Your Dream Trip</h3>
