@@ -621,7 +621,19 @@ Generate complete, accurate days for the missing dates only."""
         else:
             travel_mode = f"{args.get('travelType', 'trip')} to {destination}"
             geo_context = f"DESTINATION MODE: ALL activities must be within reasonable distance of {destination} area."
-
+        cuisine_preference = args.get('cuisinePreference', 'any')
+        cuisine_instruction = ""
+        if cuisine_preference != 'any':
+            if cuisine_preference == 'local':
+                cuisine_instruction = "Focus on authentic local and traditional restaurants of the region. "
+            elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
+                cuisine_instruction = f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
+            elif cuisine_preference == 'international':
+                cuisine_instruction = "Suggest a diverse mix of international restaurants representing various world cuisines. "
+            elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai', 'other']:
+                cuisine_instruction = f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
+            else:
+                cuisine_instruction = f"Consider {cuisine_preference} cuisine if possible. "
         # Traveler info
         traveler_info = f"{args.get('adults', 2)} adults"
         if args.get('children', 0) > 0:
@@ -637,13 +649,10 @@ Generate complete, accurate days for the missing dates only."""
         local_focus = ""
         if 'hidden-gems' in preferences:
             local_focus = """HIDDEN GEMS - LOCAL FOCUS: Prioritize authentic LOCAL experiences:
-- LOCAL favorites: family-run businesses, neighborhood spots, LOCAL institutions
+- LOCAL favorites: family-run businesses, neighborhood spots popular for locals
 - Places where LOCALS go - not tourist traps or chain establishments  
 - LOCAL markets, festivals, community centers, family restaurants
-- LOCAL-owned shops, artisan workshops, cultural venues
-- LOCAL neighborhoods where residents live and work
-- LOCAL traditions, customs, stories and history
-- Balance accessibility with LOCAL authenticity"""
+- LOCAL-owned shops, artisan workshops, cultural venues"""
 
         prompt = f"""Generate a high-quality {expected_days}-day itinerary for {dates_text}
 
@@ -667,7 +676,7 @@ QUALITY REQUIREMENTS:
 TYPE RULES:
 - Use ONLY ONE type per activity from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
 - NEVER combine types (NO "outdoor, family-friendly" - choose ONE)
-- Prioritize user preferences: {preferences_text}
+- Prioritize user preferences: {preferences_text}. {cuisine_instruction}
 
 FORMAT:
 [DAY_START]
