@@ -9,6 +9,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { FaPlaneDeparture, FaEdit, FaSave, FaList, FaShareAlt, FaWhatsapp, FaTelegram, FaFacebook, FaCopy, FaFileDownload, FaFileAlt, FaCalendarAlt } from 'react-icons/fa';
 import { useAuth } from './contexts/AuthContext';
 import AuthForm from './components/AuthForm';
+import AuthCallback from './components/AuthCallback';
 import { saveTrip, updateTrip, getTripById } from './services/tripService';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -1159,6 +1160,7 @@ const App = () => {
       <div className="App">
         <ToastContainer position="top-right" autoClose={5000} />
         <Routes>
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/" element={<MainApp />} />
           <Route path="/trips" element={<TripList />} />
           <Route path="/credits" element={<Credits />} />

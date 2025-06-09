@@ -135,6 +135,118 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 if not GOOGLE_CLIENT_ID:
     raise ValueError("GOOGLE_CLIENT_ID environment variable is not set")
 
+@app.post("/auth/google/callback")
+async def google_auth_callback(
+    request: Request,
+    users_collection = Depends(get_user_collection)
+):
+    """
+    Handle OAuth callback for embedded browsers (like Telegram)
+    Exchange authorization code for access token
+    """
+    try:
+        body = await request.json()
+        code = body.get('code')
+        redirect_uri = body.get('redirect_uri')
+        state = body.get('state')
+        
+        if not code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Authorization code is required"
+            )
+        
+        logger.info(f"Processing OAuth callback with code: {code[:10]}...")
+        
+        # Exchange authorization code for access token
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            'client_id': GOOGLE_CLIENT_ID,
+            'client_secret': os.getenv("GOOGLE_CLIENT_SECRET"),
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': redirect_uri or f"{request.base_url}auth/callback"
+        }
+        
+        import requests
+        token_response = requests.post(token_url, data=token_data)
+        
+        if not token_response.ok:
+            logger.error(f"Token exchange failed: {token_response.status_code} - {token_response.text}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to exchange authorization code for token"
+            )
+        
+        token_json = token_response.json()
+        access_token = token_json.get('access_token')
+        refresh_token = token_json.get('refresh_token')
+        
+        if not access_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No access token received from Google"
+            )
+        
+        # Now use this access token to get user info (same as existing flow)
+        credentials = HTTPAuthorizationCredentials(
+            scheme="Bearer",
+            credentials=access_token
+        )
+        
+        user_data = await get_current_user(credentials, users_collection)
+        
+        # Convert to dict if it's a Pydantic model
+        if hasattr(user_data, 'model_dump'):
+            user_data = user_data.model_dump()
+        elif hasattr(user_data, 'dict'):
+            user_data = user_data.dict()
+        
+        # Generate JWT tokens for longer sessions
+        user_id = user_data.get("id") or user_data.get("_id")
+        jwt_access_token = jwt_service.create_access_token(user_data)
+        jwt_refresh_token = jwt_service.create_refresh_token(user_id)
+        
+        # Store refresh tokens
+        update_data = {"updated_at": datetime.now()}
+        if refresh_token:
+            update_data["google_refresh_token"] = refresh_token
+        update_data["jwt_refresh_token"] = jwt_refresh_token
+        
+        users_collection.update_one(
+            {"_id": user_id},
+            {"$set": update_data}
+        )
+        
+        logger.info(f"OAuth callback successful for user: {user_data['email']}")
+        
+        # Return user response with JWT tokens
+        response = UserResponse(
+            id=user_id,
+            email=user_data["email"],
+            name=user_data["name"],
+            available_credits=user_data.get("available_credits", 0),
+            total_credits_purchased=user_data.get("total_credits_purchased", 0)
+        )
+        
+        # Add JWT tokens to response headers
+        headers = {
+            "X-Access-Token": jwt_access_token,
+            "X-Refresh-Token": jwt_refresh_token
+        }
+        
+        return JSONResponse(
+            content=response.model_dump(),
+            headers=headers
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in google_auth_callback: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @app.post("/auth/google", response_model=UserResponse)
 async def google_auth(
     request: Request,

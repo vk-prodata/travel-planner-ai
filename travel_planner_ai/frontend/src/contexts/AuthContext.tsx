@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '../types';
 import { getUserCredits } from '../services/creditsService';
+import { getBrowserInfo, logBrowserInfo } from '../utils/browserDetection';
+import { 
+  initiateRedirectAuth, 
+  getOAuthConfig, 
+  getTokenRequestOptions,
+  parseOAuthCallback,
+  parseStateParameter,
+  storeUserTokens,
+  cleanupCallbackUrl,
+  getAndClearAuthState
+} from '../utils/authHelpers';
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +45,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const tryRestoreSession = async () => {
+      // Check for OAuth callback parameters first
+      const { code, state, error } = parseOAuthCallback();
+
+      if (code) {
+        console.log('OAuth callback detected, processing...');
+        try {
+          // Handle OAuth callback
+          const tokenResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/auth/google/callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code,
+              redirect_uri: window.location.origin + '/auth/callback',
+              state: parseStateParameter(state)
+            })
+          });
+
+          if (tokenResponse.ok) {
+            const tokenData = await tokenResponse.json();
+            const jwtAccessToken = tokenResponse.headers.get('X-Access-Token');
+            const jwtRefreshToken = tokenResponse.headers.get('X-Refresh-Token');
+
+            // Store tokens and user data using centralized utility
+            storeUserTokens(tokenData, jwtAccessToken || undefined, jwtRefreshToken || undefined);
+
+            // Update user state
+            const userData: User = {
+              id: tokenData.id,
+              name: tokenData.name,
+              email: tokenData.email,
+              availableCredits: tokenData.available_credits,
+              totalCreditsPurchased: tokenData.total_credits_purchased
+            };
+            setUser(userData);
+
+            // Clean up URL and redirect using centralized utility
+            const authState = getAndClearAuthState();
+            const returnUrl = authState?.returnUrl || '/';
+            cleanupCallbackUrl(returnUrl);
+            
+            console.log('OAuth callback processed successfully');
+            return;
+          } else {
+            console.error('OAuth callback failed:', await tokenResponse.text());
+          }
+        } catch (error) {
+          console.error('Error processing OAuth callback:', error);
+        } finally {
+          loadGoogleScript();
+        }
+        return;
+      }
+
+      if (error) {
+        console.error('OAuth error:', error);
+        loadGoogleScript();
+        return;
+      }
+
       const storedToken = localStorage.getItem('token');
       const storedEmail = localStorage.getItem('userEmail');
       const storedUserId = localStorage.getItem('userId');
@@ -72,6 +144,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const loadGoogleScript = () => {
+      // Log browser information for debugging
+      logBrowserInfo();
+
       const script = document.createElement('script');
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
@@ -84,13 +159,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               throw new Error('Google Client ID not found in environment variables');
             }
 
-            const client = window.google.accounts.oauth2.initTokenClient({
-              client_id: clientId,
-              scope: 'email profile openid',
-              callback: handleCredentialResponse,
-              access_type: 'offline',
-              prompt: 'consent'
-            });
+            // Use optimal configuration based on browser type
+            const tokenClientConfig = getOAuthConfig(clientId, handleCredentialResponse);
+
+            const client = window.google.accounts.oauth2.initTokenClient(tokenClientConfig);
             
             setTokenClient(client);
             setLoading(false);
@@ -100,6 +172,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       };
+      
+      script.onerror = () => {
+        console.error('Failed to load Google Auth script');
+        setLoading(false);
+      };
+      
       document.head.appendChild(script);
     };
 
@@ -176,10 +254,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async () => {
     if (tokenClient) {
-      return new Promise<void>((resolve) => {
+      const browserInfo = getBrowserInfo();
+      console.log('Initiating sign-in:', browserInfo);
+
+      return new Promise<void>((resolve, reject) => {
         tokenClient.callback = async (response: any) => {
           if (response.error) {
             console.error('Sign in error:', response.error);
+            
+            // For embedded browsers, try alternative approaches
+            if (browserInfo.isEmbedded && response.error === 'popup_closed_by_user') {
+              console.log('Popup blocked in embedded browser, attempting redirect flow');
+              try {
+                await initiateRedirectAuth();
+                resolve();
+                return;
+              } catch (redirectError) {
+                console.error('Redirect auth also failed:', redirectError);
+                reject(new Error('Authentication failed in embedded browser'));
+                return;
+              }
+            }
+            
+            reject(new Error(response.error));
             return;
           }
 
@@ -188,7 +285,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               tokenType: response.token_type,
               scope: response.scope,
               tokenLength: response.access_token?.length,
-              hasRefreshToken: !!response.refresh_token
+              hasRefreshToken: !!response.refresh_token,
+              browserInfo
             });
 
             const token = response.access_token;
@@ -262,9 +360,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         };
 
-        tokenClient.requestAccessToken({
-          prompt: 'consent'
-        });
+        // Use optimal request options based on browser type
+        const requestOptions = getTokenRequestOptions(browserInfo);
+        console.log('Using auth flow:', browserInfo.requiresRedirectAuth ? 'redirect' : 'popup');
+        tokenClient.requestAccessToken(requestOptions);
       });
     }
     return Promise.resolve();

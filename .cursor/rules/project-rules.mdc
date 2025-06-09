@@ -6,6 +6,7 @@ alwaysApply: false
 
 # Your rule content
 
+- Trip Prompt MUST return the same structure (dont' change it). Should return high quality suggestions best on users requirements
 - "Always refer to instructions.md file for the context about the current feature that I'm implementing"
 - "If I ask you to implement a feature always present an overview of its planned implementation before generating any code and add code below"
 - "Write 1-2 integration tests before implementing features"
