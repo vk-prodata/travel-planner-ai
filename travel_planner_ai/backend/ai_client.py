@@ -582,23 +582,20 @@ Generate complete, accurate days for the missing dates only."""
         
         return all_previous_days
 
-    def _generate_prompt(self, args: Dict[str, Any]) -> str:
-        """Generate an efficient prompt with all critical logic preserved"""
-        # Calculate expected number of days
-        from datetime import datetime, timedelta
-        start_date = datetime.strptime(args.get('startDate'), '%Y-%m-%d')
-        end_date = datetime.strptime(args.get('endDate'), '%Y-%m-%d')
-        expected_days = (end_date - start_date).days + 1
+    def _build_trip_context(self, args: Dict[str, Any]) -> Dict[str, str]:
+        """Build reusable trip context information"""
+        # Geographic context
+        destination = args.get('destination', '').strip()
+        origin = args.get('origin', '').strip()
         
-        # Format dates
-        date_list = []
-        current_date = start_date
-        while current_date <= end_date:
-            date_list.append(current_date.strftime('%Y-%m-%d'))
-            current_date += timedelta(days=1)
-        dates_text = ', '.join(date_list)
-
-        # Format intermediate stops if they exist
+        if origin and origin.lower() != 'origin':
+            travel_mode = f"{args.get('travelType', 'trip')} from {origin} to {destination}"
+            geo_context = f"ROUTE MODE: Plan activities along {origin} → {destination} route. Include stops that make geographic sense for this journey."
+        else:
+            travel_mode = f"{args.get('travelType', 'trip')} to {destination}"
+            geo_context = f"DESTINATION MODE: ALL activities must be within reasonable distance of {destination} area."
+            
+        # Intermediate stops
         intermediate_stops_text = ""
         if args.get('intermediateStops') and len(args.get('intermediateStops')) > 0:
             stops = []
@@ -610,42 +607,30 @@ Generate complete, accurate days for the missing dates only."""
                 else:
                     stops.append(str(stop_data))
             intermediate_stops_text = f" via {', '.join(stops)}"
-
-        # Geographic context - restored detailed logic
-        destination = args.get('destination', '').strip()
-        origin = args.get('origin', '').strip()
-        
-        if origin and origin.lower() != 'origin':
-            travel_mode = f"{args.get('travelType', 'trip')} from {origin} to {destination}"
-            geo_context = f"ROUTE MODE: Plan activities along {origin} → {destination} route. Include stops that make geographic sense for this journey."
-        else:
-            travel_mode = f"{args.get('travelType', 'trip')} to {destination}"
-            geo_context = f"DESTINATION MODE: ALL activities must be within reasonable distance of {destination} area."
-        cuisine_preference = args.get('cuisinePreference', 'any')
-        cuisine_instruction = ""
-        if cuisine_preference != 'any':
-            if cuisine_preference == 'local':
-                cuisine_instruction = "Focus on authentic local and traditional restaurants of the region. "
-            elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
-                cuisine_instruction = f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
-            elif cuisine_preference == 'international':
-                cuisine_instruction = "Suggest a diverse mix of international restaurants representing various world cuisines. "
-            elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai', 'other']:
-                cuisine_instruction = f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
-            else:
-                cuisine_instruction = f"Consider {cuisine_preference} cuisine if possible. "
-        # Traveler info
+            
+        return {
+            'travel_mode': travel_mode,
+            'geo_context': geo_context,
+            'intermediate_stops_text': intermediate_stops_text
+        }
+    
+    def _build_traveler_info(self, args: Dict[str, Any], compact: bool = False) -> str:
+        """Build traveler information string"""
         traveler_info = f"{args.get('adults', 2)} adults"
         if args.get('children', 0) > 0:
-            traveler_info += f", {args.get('children', 0)} children"
+            separator = " + " if compact else ", "
+            traveler_info += f"{separator}{args.get('children', 0)} children"
         if args.get('infants', 0) > 0:
-            traveler_info += f", {args.get('infants', 0)} infants"
-
-        # Preferences with detailed hidden gems logic
+            separator = " + " if compact else ", "
+            traveler_info += f"{separator}{args.get('infants', 0)} infants"
+        return traveler_info
+    
+    def _build_preferences_context(self, args: Dict[str, Any]) -> Dict[str, str]:
+        """Build preferences and local focus context"""
         preferences = args.get('entertainmentPreferences', [])
         preferences_text = ', '.join(preferences) if preferences else 'general'
         
-        # Detailed LOCAL focus for hidden gems - restored critical logic
+        # Hidden gems focus
         local_focus = ""
         if 'hidden-gems' in preferences:
             local_focus = """HIDDEN GEMS - LOCAL FOCUS: Prioritize authentic LOCAL experiences:
@@ -653,32 +638,32 @@ Generate complete, accurate days for the missing dates only."""
 - Places where LOCALS go - not tourist traps or chain establishments  
 - LOCAL markets, festivals, community centers, family restaurants
 - LOCAL-owned shops, artisan workshops, cultural venues"""
-
-        prompt = f"""Generate a high-quality {expected_days}-day itinerary for {dates_text}
-
-Trip: {travel_mode}{intermediate_stops_text}
-{traveler_info} | Budget: {args.get('budgetLevel', 'mid-range')}
-Preferences: {preferences_text}
-{geo_context}
-{local_focus}
-
-QUALITY REQUIREMENTS:
-- Target {expected_days} days: {dates_text}
-- 3-5 activities per day with detailed descriptions
-- MANDATORY: 1+ food activity daily (type "food")
-- ALL activities MUST match preferences: {preferences_text}
-- ALL activities MUST fit {args.get('budgetLevel', 'mid-range')} budget
-- ALL activities MUST suit traveler composition
-- NO activities that contradict user filters
-- 2-3 sentence descriptions with details, context, insider tips
-- Explain why each specifically matches {preferences_text} preferences
-
-TYPE RULES:
-- Use ONLY ONE type per activity from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
-- NEVER combine types (NO "outdoor, family-friendly" - choose ONE)
-- Prioritize user preferences: {preferences_text}. {cuisine_instruction}
-
-FORMAT:
+            
+        return {
+            'preferences_text': preferences_text,
+            'local_focus': local_focus
+        }
+    
+    def _build_cuisine_instruction(self, args: Dict[str, Any]) -> str:
+        """Build cuisine preference instruction"""
+        cuisine_preference = args.get('cuisinePreference', 'any')
+        if cuisine_preference == 'any':
+            return ""
+            
+        if cuisine_preference == 'local':
+            return "Focus on authentic local and traditional restaurants of the region. "
+        elif cuisine_preference in ['vegetarian', 'vegan', 'halal', 'kosher']:
+            return f"Only suggest {cuisine_preference} restaurants and cafes. Ensure all meal recommendations comply with {cuisine_preference} dietary requirements. "
+        elif cuisine_preference == 'international':
+            return "Suggest a diverse mix of international restaurants representing various world cuisines. "
+        elif cuisine_preference in ['seafood', 'mediterranean', 'asian', 'european', 'american', 'mexican', 'japanese', 'italian', 'slavic', 'indian', 'thai', 'other']:
+            return f"Prioritize {cuisine_preference} restaurants and cafes for meal recommendations. When possible, suggest authentic establishments. "
+        else:
+            return f"Consider {cuisine_preference} cuisine if possible. "
+    
+    def _get_activity_format_template(self) -> str:
+        """Get the standard activity format template"""
+        return """FORMAT:
 [DAY_START]
 Date: YYYY-MM-DD
 [ACTIVITY_START]
@@ -687,9 +672,65 @@ Type: ONE type only
 Price: free/$/$$/$$$ 
 Location: Specific venue name, City
 Description: 2-3 sentences with details, historical context, practical tips
-Why: How this specifically matches {preferences_text} and {args.get('budgetLevel', 'mid-range')} budget
+Why: How this specifically matches preferences and budget
 [ACTIVITY_END]
-[DAY_END]
+[DAY_END]"""
+    
+    def _get_quality_requirements(self, preferences_text: str, budget: str, expected_days: int, dates_text: str) -> str:
+        """Get standard quality requirements"""
+        return f"""QUALITY REQUIREMENTS:
+- Target {expected_days} days: {dates_text}
+- 3-5 activities per day with detailed descriptions
+- MANDATORY: 1+ food activity daily (type "food")
+- ALL activities MUST match preferences: {preferences_text}
+- ALL activities MUST fit {budget} budget
+- ALL activities MUST suit traveler composition
+- NO activities that contradict user filters
+- 2-3 sentence descriptions with details, context, insider tips
+- Explain why each specifically matches {preferences_text} preferences"""
+    
+    def _get_type_rules(self, preferences_text: str, cuisine_instruction: str) -> str:
+        """Get standard type rules"""
+        return f"""TYPE RULES:
+- Use ONLY ONE type per activity from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
+- NEVER combine types (NO "outdoor, family-friendly" - choose ONE)
+- Prioritize user preferences: {preferences_text}. {cuisine_instruction}"""
+
+    def _generate_prompt(self, args: Dict[str, Any]) -> str:
+        """Generate an efficient prompt with all critical logic preserved"""
+        # Calculate expected number of days and format dates
+        from datetime import datetime, timedelta
+        start_date = datetime.strptime(args.get('startDate'), '%Y-%m-%d')
+        end_date = datetime.strptime(args.get('endDate'), '%Y-%m-%d')
+        expected_days = (end_date - start_date).days + 1
+        
+        date_list = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_list.append(current_date.strftime('%Y-%m-%d'))
+            current_date += timedelta(days=1)
+        dates_text = ', '.join(date_list)
+
+        # Build reusable components
+        trip_context = self._build_trip_context(args)
+        traveler_info = self._build_traveler_info(args)
+        preferences_context = self._build_preferences_context(args)
+        cuisine_instruction = self._build_cuisine_instruction(args)
+        
+        # Build the main prompt
+        prompt = f"""Generate a high-quality {expected_days}-day itinerary for {dates_text}
+
+Trip: {trip_context['travel_mode']}{trip_context['intermediate_stops_text']}
+{traveler_info} | Budget: {args.get('budgetLevel', 'mid-range')}
+Preferences: {preferences_context['preferences_text']}
+{trip_context['geo_context']}
+{preferences_context['local_focus']}
+
+{self._get_quality_requirements(preferences_context['preferences_text'], args.get('budgetLevel', 'mid-range'), expected_days, dates_text)}
+
+{self._get_type_rules(preferences_context['preferences_text'], cuisine_instruction)}
+
+{self._get_activity_format_template()}
 
 Focus on quality and accuracy. Generate as many complete days as possible within response limits."""
 
@@ -715,26 +756,20 @@ Focus on quality and accuracy. Generate as many complete days as possible within
         # Identify missing dates
         missing_dates = [date for date in all_dates if date not in generated_dates]
         
-        # Geographic context
+        # Build context using helper methods
+        preferences_context = self._build_preferences_context(args)
+        traveler_info = self._build_traveler_info(args, compact=True)
+        
+        # Simplified geographic context for retry
         destination = args.get('destination', '').strip()
         origin = args.get('origin', '').strip()
-        
         if origin and origin.lower() != 'origin':
             geo_context = f"ROUTE: Activities along {origin} → {destination} journey"
         else:
             geo_context = f"DESTINATION: Activities near {destination} only"
 
-        # Preferences with hidden gems focus
-        preferences = args.get('entertainmentPreferences', [])
-        preferences_text = ', '.join(preferences) if preferences else 'general'
+        local_note = "Focus on authentic LOCAL experiences where LOCALS go" if 'hidden-gems' in preferences_context['preferences_text'] else ""
         
-        local_note = "Focus on authentic LOCAL experiences where LOCALS go" if 'hidden-gems' in preferences else ""
-        
-        # Traveler info
-        traveler_info = f"{args.get('adults', 2)} adults"
-        if args.get('children', 0) > 0:
-            traveler_info += f" + {args.get('children', 0)} children"
-
         if missing_dates:
             # Limit to first 5 missing dates to avoid overwhelming the AI
             dates_to_generate = missing_dates[:5]
@@ -748,13 +783,13 @@ Focus on quality and accuracy. Generate as many complete days as possible within
         retry_prompt = f"""{continuation_text}
 
 {geo_context} | {traveler_info} | {args.get('budgetLevel', 'mid-range')}
-Preferences: {preferences_text}
+Preferences: {preferences_context['preferences_text']}
 {local_note}
 
 CONTINUATION RULES:
 - Generate ONLY the specific dates listed above
 - Do NOT regenerate any existing dates: {', '.join(generated_dates) if generated_dates else 'none generated yet'}
-- Match user preferences: {preferences_text}
+- Match user preferences: {preferences_context['preferences_text']}
 - Fit budget: {args.get('budgetLevel', 'mid-range')}
 - Include 1+ food activity daily (type "food")
 - 2-3 sentence descriptions with specific details
@@ -765,11 +800,11 @@ FORMAT (Use exact dates specified above):
 Date: YYYY-MM-DD (from the specific dates list above)
 [ACTIVITY_START]
 Time: HH:MM - HH:MM
-Type: ONE from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
+Type: ONE from: {preferences_context['preferences_text']} OR food OR must-see OR hidden-gems OR family-friendly
 Price: free/$/$$/$$$ 
 Location: Specific venue name, City
 Description: 2-3 sentences with details, context, tips
-Why: How this matches {preferences_text} and budget
+Why: How this matches {preferences_context['preferences_text']} and budget
 [ACTIVITY_END]
 [DAY_END]
 
