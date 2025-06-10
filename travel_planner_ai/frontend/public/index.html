@@ -28,7 +28,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Travel Planner AI - Plan Your Perfect Trip" />
     <meta name="twitter:description" content="Your intelligent assistant for planning perfect trips. Create personalized itineraries, discover attractions, and organize your travel with ease." />
-    <meta name="twitter:image" content="%PUBLIC_URL%/logo512.png" />
+    <meta property="twitter:image" content="%PUBLIC_URL%/logo512.png" />
     <meta name="twitter:site" content="@travelplannerai" />
     <meta name="twitter:creator" content="@travelplannerai" />
     
@@ -44,9 +44,6 @@
     <meta name="mobile-web-capable" content="yes" />
     <meta name="mobile-web-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
-    
-    <!-- Prevent In-App Browser Opening -->
-    <meta http-equiv="refresh" content="0; url=#" id="external-browser-redirect" />
     
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="canonical" href="https://travelplannerai.org" />
@@ -132,7 +129,7 @@
           }
         };
         
-        // Auto-redirect for shared links in embedded browsers
+        // Auto-redirect for shared links in embedded browsers (only for shared links)
         if (isEmbedded && window.location.search.includes('utm_source=share')) {
           console.log('[EXTERNAL_BROWSER] Auto-redirecting shared link from embedded browser');
           setTimeout(() => {
