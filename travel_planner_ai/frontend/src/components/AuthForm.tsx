@@ -4,6 +4,7 @@ import { Button, Spinner, Alert } from 'react-bootstrap';
 import { FcGoogle } from 'react-icons/fc';
 import { getBrowserInfo, getBrowserDisplayName } from '../utils/browserDetection';
 import { openInExternalBrowser } from '../utils/authHelpers';
+import { testOAuthRedirect } from '../utils/debugAuth';
 
 const AuthForm: React.FC = () => {
   const { signIn } = useAuth();
@@ -18,6 +19,10 @@ const AuthForm: React.FC = () => {
     try {
       setError(null);
       setIsLoading(true);
+      
+      // Debug OAuth configuration
+      const debugResult = testOAuthRedirect();
+      console.log('OAuth Debug Result:', debugResult);
       
       // Show tip for embedded browsers
       if (browserInfo.isEmbedded) {
