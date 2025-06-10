@@ -921,12 +921,17 @@ const MainApp = () => {
                                 <Dropdown.Divider />
                                 <Dropdown.Item 
                                   as="button" 
-                                  onClick={() => { 
-                                    const shareUrl = encodeURIComponent(window.location.href);
-                                    const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
-                                    const whatsappUrl = `https://wa.me/?text=${shareTitle}%20${shareUrl}`;
-                                    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-                                    notifySuccess('WhatsApp share window opened!');
+                                  onClick={async () => { 
+                                    const { shareWithExternalBrowser } = await import('./utils/externalBrowser');
+                                    const duration = Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 60 * 60 * 24));
+                                    const success = await shareWithExternalBrowser('whatsapp', {
+                                      url: window.location.href,
+                                      title: `Check out my trip to ${formData.destination}!`,
+                                      description: `${duration} day trip to ${formData.destination}`
+                                    });
+                                    if (success) {
+                                      notifySuccess('WhatsApp share opened in external browser!');
+                                    }
                                   }}
                                 >
                                   <FaWhatsapp className="me-2 text-success" />
@@ -934,12 +939,17 @@ const MainApp = () => {
                                 </Dropdown.Item>
                                 <Dropdown.Item 
                                   as="button" 
-                                  onClick={() => { 
-                                    const shareUrl = encodeURIComponent(window.location.href);
-                                    const shareTitle = encodeURIComponent(`Check out my trip to ${formData.destination}!`);
-                                    const telegramUrl = `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`;
-                                    window.open(telegramUrl, '_blank', 'noopener,noreferrer');
-                                    notifySuccess('Telegram share window opened!');
+                                  onClick={async () => { 
+                                    const { shareWithExternalBrowser } = await import('./utils/externalBrowser');
+                                    const duration = Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 60 * 60 * 24));
+                                    const success = await shareWithExternalBrowser('telegram', {
+                                      url: window.location.href,
+                                      title: `Check out my trip to ${formData.destination}!`,
+                                      description: `${duration} day trip to ${formData.destination}`
+                                    });
+                                    if (success) {
+                                      notifySuccess('Telegram share opened in external browser!');
+                                    }
                                   }}
                                 >
                                   <FaTelegram className="me-2 text-primary" />
@@ -947,12 +957,17 @@ const MainApp = () => {
                                 </Dropdown.Item>
                                 <Dropdown.Item 
                                   as="button" 
-                                  onClick={() => { 
-                                    // For Facebook, we only need the URL
-                                    const shareUrl = encodeURIComponent(window.location.href);
-                                    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
-                                    window.open(facebookUrl, '_blank', 'noopener,noreferrer');
-                                    notifySuccess('Facebook share window opened!');
+                                  onClick={async () => { 
+                                    const { shareWithExternalBrowser } = await import('./utils/externalBrowser');
+                                    const duration = Math.ceil((new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) / (1000 * 60 * 60 * 24));
+                                    const success = await shareWithExternalBrowser('facebook', {
+                                      url: window.location.href,
+                                      title: `Check out my trip to ${formData.destination}!`,
+                                      description: `${duration} day trip to ${formData.destination}`
+                                    });
+                                    if (success) {
+                                      notifySuccess('Facebook share opened in external browser!');
+                                    }
                                   }}
                                 >
                                   <FaFacebook className="me-2 text-primary" />

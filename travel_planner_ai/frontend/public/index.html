@@ -11,6 +11,8 @@
     <meta name="keywords" content="travel planner, trip planning, travel itinerary, AI travel assistant, vacation planner" />
     <meta name="author" content="Travel Planner AI Team" />
     <meta name="robots" content="index, follow" />
+    
+    <!-- Enhanced Open Graph Meta Tags for Better Social Sharing -->
     <meta property="og:title" content="Travel Planner AI - Plan Your Perfect Trip" />
     <meta property="og:description" content="Your intelligent assistant for planning perfect trips. Create personalized itineraries, discover attractions, and organize your travel with ease." />
     <meta property="og:image" content="%PUBLIC_URL%/logo512.png" />
@@ -20,27 +22,161 @@
     <meta property="og:site_name" content="Travel Planner AI" />
     <meta property="og:url" content="https://travelplannerai.org" />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Travel Planner AI - Plan Your Perfect Trip" />
     <meta name="twitter:description" content="Your intelligent assistant for planning perfect trips. Create personalized itineraries, discover attractions, and organize your travel with ease." />
     <meta name="twitter:image" content="%PUBLIC_URL%/logo512.png" />
+    <meta name="twitter:site" content="@travelplannerai" />
+    <meta name="twitter:creator" content="@travelplannerai" />
+    
+    <!-- Telegram-specific Meta Tags -->
+    <meta property="telegram:channel" content="@travelplannerai" />
+    
+    <!-- WhatsApp-specific Meta Tags -->
+    <meta property="whatsapp:title" content="Travel Planner AI - Plan Your Perfect Trip" />
+    <meta property="whatsapp:description" content="Your intelligent assistant for planning perfect trips. Create personalized itineraries, discover attractions, and organize your travel with ease." />
+    <meta property="whatsapp:image" content="%PUBLIC_URL%/logo512.png" />
+    
+    <!-- Force External Browser Meta Tags -->
+    <meta name="mobile-web-capable" content="yes" />
+    <meta name="mobile-web-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    
+    <!-- Prevent In-App Browser Opening -->
+    <meta http-equiv="refresh" content="0; url=#" id="external-browser-redirect" />
+    
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="canonical" href="https://travelplannerai.org" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
+    
     <title>Travel Planner AI - Plan Your Perfect Trip</title>
+    
+    <!-- Professional External Browser Detection & Redirection Script -->
+    <script>
+      (function() {
+        'use strict';
+        
+        // Comprehensive browser detection
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isEmbedded = userAgent.includes('webview') || 
+                          userAgent.includes('wv') ||
+                          userAgent.includes('telegram') ||
+                          userAgent.includes('whatsapp') ||
+                          userAgent.includes('instagram') ||
+                          userAgent.includes('facebook') ||
+                          userAgent.includes('twitter') ||
+                          userAgent.includes('line') ||
+                          userAgent.includes('snapchat') ||
+                          userAgent.includes('tiktok') ||
+                          userAgent.includes('linkedin');
+        
+        const isTelegram = userAgent.includes('telegram') || 
+                          userAgent.includes('telegramwebview') ||
+                          window.location.href.includes('tgWebAppPlatform');
+        
+        // Store browser info globally for React app
+        window.__BROWSER_INFO__ = {
+          isEmbedded: isEmbedded,
+          isTelegram: isTelegram,
+          userAgent: navigator.userAgent,
+          timestamp: Date.now()
+        };
+        
+        // Professional external browser opening handler
+        window.__OPEN_EXTERNAL__ = function(url = window.location.href) {
+          try {
+            // Method 1: Standard window.open with aggressive flags
+            const opened = window.open(url, '_blank', 'noopener,noreferrer,menubar=yes,toolbar=yes,location=yes,status=yes,scrollbars=yes,resizable=yes');
+            
+            if (!opened || opened.closed) {
+              // Method 2: Create temporary link element
+              const link = document.createElement('a');
+              link.href = url;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              link.style.display = 'none';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+            
+            // Method 3: Native app deep links (fallback)
+            setTimeout(() => {
+              try {
+                // Try Chrome
+                window.location.href = 'googlechrome://navigate?url=' + encodeURIComponent(url);
+              } catch (e) {
+                try {
+                  // Try Safari
+                  window.location.href = url;
+                } catch (e2) {
+                  // Final fallback - copy to clipboard
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(url);
+                    alert('Link copied to clipboard! Please paste it in your browser.');
+                  }
+                }
+              }
+            }, 100);
+            
+          } catch (error) {
+            console.error('Failed to open external browser:', error);
+            // Ultimate fallback
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(url);
+              alert('Please copy this link to your browser: ' + url);
+            }
+          }
+        };
+        
+        // Auto-redirect for shared links in embedded browsers
+        if (isEmbedded && window.location.search.includes('utm_source=share')) {
+          console.log('[EXTERNAL_BROWSER] Auto-redirecting shared link from embedded browser');
+          setTimeout(() => {
+            window.__OPEN_EXTERNAL__();
+          }, 1000);
+        }
+        
+        // Enhanced sharing functionality
+        window.__SMART_SHARE__ = function(platform, url = window.location.href, title = document.title) {
+          const shareUrl = encodeURIComponent(url + '?utm_source=share&utm_medium=' + platform);
+          const shareTitle = encodeURIComponent(title);
+          
+          let platformUrl;
+          switch (platform) {
+            case 'telegram':
+              platformUrl = `https://t.me/share/url?url=${shareUrl}&text=${shareTitle}`;
+              break;
+            case 'whatsapp':
+              platformUrl = `https://wa.me/?text=${shareTitle}%20${shareUrl}`;
+              break;
+            case 'facebook':
+              platformUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
+              break;
+            case 'twitter':
+              platformUrl = `https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareTitle}`;
+              break;
+            case 'linkedin':
+              platformUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`;
+              break;
+            default:
+              platformUrl = url;
+          }
+          
+          window.__OPEN_EXTERNAL__(platformUrl);
+        };
+        
+        console.log('[EXTERNAL_BROWSER] Detection complete:', {
+          isEmbedded: isEmbedded,
+          isTelegram: isTelegram,
+          userAgent: userAgent
+        });
+        
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

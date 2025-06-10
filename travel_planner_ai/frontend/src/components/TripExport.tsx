@@ -110,9 +110,24 @@ const TripExport: React.FC<TripExportProps> = ({ itinerary, formData }) => {
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`;
   const twitterUrl = `https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareTitle}`;
 
-  const openShareUrl = (url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
-    toast.success('Share window opened!');
+  const openShareUrl = async (url: string, platform: string) => {
+    try {
+      const { openInExternalBrowser } = await import('../utils/externalBrowser');
+      const success = await openInExternalBrowser({
+        url,
+        trackingParams: {
+          share_source: 'trip_export',
+          share_platform: platform
+        }
+      });
+      if (success) {
+        toast.success(`${platform} share opened in external browser!`);
+      }
+    } catch (error) {
+      // Fallback to standard window.open
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success('Share window opened!');
+    }
   };
 
   return (
@@ -154,7 +169,7 @@ const TripExport: React.FC<TripExportProps> = ({ itinerary, formData }) => {
               <Button 
                 variant="link" 
                 className="p-1 rounded-circle share-icon-button" 
-                onClick={() => openShareUrl(whatsappUrl)}
+                onClick={() => openShareUrl(whatsappUrl, 'WhatsApp')}
               >
                 <FaWhatsapp size={32} className="text-success" />
               </Button>
@@ -162,7 +177,7 @@ const TripExport: React.FC<TripExportProps> = ({ itinerary, formData }) => {
               <Button 
                 variant="link" 
                 className="p-1 rounded-circle share-icon-button" 
-                onClick={() => openShareUrl(telegramUrl)}
+                onClick={() => openShareUrl(telegramUrl, 'Telegram')}
               >
                 <FaTelegram size={32} className="text-primary" />
               </Button>
@@ -170,7 +185,7 @@ const TripExport: React.FC<TripExportProps> = ({ itinerary, formData }) => {
               <Button 
                 variant="link" 
                 className="p-1 rounded-circle share-icon-button" 
-                onClick={() => openShareUrl(facebookUrl)}
+                onClick={() => openShareUrl(facebookUrl, 'Facebook')}
               >
                 <FaFacebook size={32} className="text-primary" />
               </Button>
@@ -178,7 +193,7 @@ const TripExport: React.FC<TripExportProps> = ({ itinerary, formData }) => {
               <Button 
                 variant="link" 
                 className="p-1 rounded-circle share-icon-button" 
-                onClick={() => openShareUrl(twitterUrl)}
+                onClick={() => openShareUrl(twitterUrl, 'Twitter')}
               >
                 <FaTwitter size={32} className="text-info" />
               </Button>
