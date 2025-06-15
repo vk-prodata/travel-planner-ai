@@ -3,6 +3,7 @@ import { Form, Button, Row, Col, OverlayTrigger, Tooltip, Accordion, Badge } fro
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
 import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType, AIProvider } from '../types';
 import LocationInput from './LocationInput';
+import DistanceFilter from './DistanceFilter';
 
 interface TripFormProps {
   onSubmit: (data: TripFormData) => void;
@@ -26,7 +27,9 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
     budget: 'mid-range',
     language: 'en',
     cuisinePreference: 'any',
-    aiProvider: 'openai' // Default to OpenAI
+    aiProvider: 'openai', // Default to OpenAI
+    exclusionRadius: 80, // Default 80 km (≈50 miles)
+    exclusionUnit: 'km'
   });
 
   const [newStop, setNewStop] = useState<Stop>({ 
@@ -140,7 +143,14 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
     // Clear any cached trip data to ensure a fresh start
     localStorage.removeItem('unsavedItinerary');
     
-    onSubmit(formData);
+    // Prepare form data - only include distance filter when origin is provided
+    const submitData = { ...formData };
+    if (!formData.origin || !showOriginField) {
+      delete submitData.exclusionRadius;
+      delete submitData.exclusionUnit;
+    }
+    
+    onSubmit(submitData);
   };
 
   // Calculate the maximum allowed days for an intermediate stop based on selected start date
@@ -213,13 +223,32 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
             onChange={(e) => {
               setShowOriginField(e.target.checked);
               if (!e.target.checked) {
-                setFormData({...formData, origin: ''});
+                setFormData({
+                  ...formData, 
+                  origin: '',
+                  exclusionRadius: 80,
+                  exclusionUnit: 'km'
+                });
               }
             }}
             className="text-muted"
           />
         </Col>
       </Row>
+
+      {/* Distance Filter - Only show when origin field is enabled */}
+      {showOriginField && (
+        <Row className="mb-3">
+          <Col>
+            <DistanceFilter
+              exclusionRadius={formData.exclusionRadius || 80}
+              exclusionUnit={formData.exclusionUnit || 'km'}
+              onRadiusChange={(radius) => setFormData({ ...formData, exclusionRadius: radius })}
+              onUnitChange={(unit) => setFormData({ ...formData, exclusionUnit: unit })}
+            />
+          </Col>
+        </Row>
+      )}
 
       {/* Dates */}
       <Row className="mb-3">

@@ -95,6 +95,8 @@ export interface TripFormData {
   language: string;
   cuisinePreference: CuisineType;
   aiProvider?: AIProvider;
+  exclusionRadius?: number;
+  exclusionUnit?: 'miles' | 'km';
 }
 
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';

@@ -32,6 +32,8 @@ export interface TripFormData {
   budgetLevel: BudgetLevel;
   budget: string;  // Keep this for now since it's used in the backend
   language: string;
+  exclusionRadius?: number;
+  exclusionUnit?: 'miles' | 'km';
 }
 
 export interface Activity {

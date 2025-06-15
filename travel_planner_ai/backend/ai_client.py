@@ -189,7 +189,8 @@ class AIClient:
         relevant_keys = [
             "userId", "destination", "startDate", "endDate", "travelType", 
             "adults", "children", "infants", "budgetLevel", "language",
-            "entertainmentPreferences", "cuisinePreference", "origin"
+            "entertainmentPreferences", "cuisinePreference", "origin",
+            "exclusionRadius", "exclusionUnit"
         ]
         
         key_data = {}
@@ -591,6 +592,17 @@ Generate complete, accurate days for the missing dates only."""
         if origin and origin.lower() != 'origin':
             travel_mode = f"{args.get('travelType', 'trip')} from {origin} to {destination}"
             geo_context = f"ROUTE MODE: Plan activities along {origin} → {destination} route. Include stops that make geographic sense for this journey."
+            
+            # Add distance exclusion if specified
+            exclusion_radius = args.get('exclusionRadius')
+            exclusion_unit = args.get('exclusionUnit', 'miles')
+            
+            if exclusion_radius is not None and exclusion_radius >= 0:
+                distance_text = f"{exclusion_radius} {exclusion_unit}"
+                if exclusion_radius > 0:
+                    geo_context += f"\n\nDISTANCE EXCLUSION: Avoid recommending activities within {distance_text} of the starting location ({origin}). Focus on activities that are at least {distance_text} away from the origin point to provide variety and prevent recommendations too close to where the journey begins."
+                # else:
+                #     geo_context += f"\n\nDISTANCE EXCLUSION: No exclusion radius set ({distance_text}). All activities along the route are acceptable."
         else:
             travel_mode = f"{args.get('travelType', 'trip')} to {destination}"
             geo_context = f"DESTINATION MODE: ALL activities must be within reasonable distance of {destination} area."
@@ -765,6 +777,17 @@ Focus on quality and accuracy. Generate as many complete days as possible within
         origin = args.get('origin', '').strip()
         if origin and origin.lower() != 'origin':
             geo_context = f"ROUTE: Activities along {origin} → {destination} journey"
+            
+            # Add distance exclusion for retry prompts
+            exclusion_radius = args.get('exclusionRadius')
+            exclusion_unit = args.get('exclusionUnit', 'miles')
+            
+            if exclusion_radius is not None and exclusion_radius >= 0:
+                distance_text = f"{exclusion_radius} {exclusion_unit}"
+                if exclusion_radius > 0:
+                    geo_context += f" | AVOID activities within {distance_text} of {origin}"
+                else:
+                    geo_context += f" | No exclusion radius ({distance_text})"
         else:
             geo_context = f"DESTINATION: Activities near {destination} only"
 

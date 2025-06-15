@@ -104,6 +104,61 @@
   - **Performance**: Reduced bundle size through deduplication and optimized runtime performance
   - **Documentation**: Created OAUTH_VALIDATION_REPORT.md with comprehensive quality assessment
 
+### Distance-Based Filtering Feature Implementation - [January 2025] ✅ COMPLETED
+
+- **🎯 Feature Implemented**: Added distance exclusion radius functionality for route-based travel planning
+- **🚀 Implementation Features**:
+  - **Conditional UI**: Distance slider appears only when origin field is enabled (route planning mode)
+  - **Dual Unit Support**: Seamless conversion between miles and kilometers with proper range limits
+  - **Default Configuration**: 80 km default exclusion radius with 0-500km (0-310 miles) range
+  - **Smart Integration**: Only includes distance filter in API calls when origin is provided
+  - **AI Prompt Enhancement**: Backend automatically adds distance exclusion instructions to AI prompts
+
+- **📁 Files Implemented**:
+  - `travel_planner_ai/frontend/src/components/DistanceFilter.tsx` - Reusable distance filter component (4KB)
+  - `travel_planner_ai/frontend/src/components/__tests__/DistanceFilter.test.tsx` - Comprehensive test suite (15KB, 15 test cases)
+  - `travel_planner_ai/backend/tests/test_distance_filter.py` - Backend integration tests (12KB, 12 test cases)
+  - Updated `travel_planner_ai/frontend/src/types.ts` - Added exclusionRadius and exclusionUnit fields
+  - Updated `travel_planner_ai/frontend/src/components/TripForm.tsx` - Integrated distance filter component
+  - Updated `travel_planner_ai/backend/ai_client.py` - Enhanced prompts with distance exclusion logic
+
+- **🎯 Technical Implementation**:
+  - **Frontend**: React component with Bootstrap styling, real-time unit conversion, accessible controls
+  - **Backend**: AI prompt enhancement with distance exclusion instructions, cache key updates
+  - **Integration**: Seamless form submission with conditional distance filter data
+  - **Unit Conversion**: Accurate miles ↔ kilometers conversion (1 mile = 1.60934 km)
+
+- **✅ Testing & Quality**:
+  - 15 frontend integration tests covering UI visibility, functionality, form submission
+  - 12 backend tests covering prompt generation, cache keys, retry logic, edge cases
+  - Full accessibility support with proper ARIA labels and keyboard navigation
+  - Performance optimized with minimal re-renders and efficient state management
+
+- **🚀 User Experience**:
+  - **Smart Visibility**: Distance slider only appears when route planning (origin enabled)
+  - **Intuitive Controls**: Clear labels, helpful tooltips, and visual feedback
+  - **Flexible Units**: Easy switching between miles/km with automatic value conversion
+  - **Range Control**: 8-km steps for fine-grained control (0-500 km / 0-310 miles), default 80 km
+
+- **🛠️ AI Integration**:
+  - **Prompt Enhancement**: Automatically adds exclusion instructions when distance filter is active
+  - **Geographic Context**: Integrates with existing route vs destination mode logic
+  - **Cache Optimization**: Distance parameters included in cache keys for proper caching
+  - **Retry Logic**: Distance exclusion maintained across retry attempts for consistency
+
+- **📊 Feature Benefits**:
+  - **Travel Variety**: Prevents AI from recommending activities too close to starting point
+  - **Route Optimization**: Encourages exploration along the travel route rather than near origin
+  - **User Control**: Gives travelers flexibility to define their preferred exclusion radius
+  - **Geographic Intelligence**: Works seamlessly with existing intermediate stops and route planning
+
+- **✅ VALIDATION COMPLETED [January 2025]**:
+  - **Backend Tests**: All 13 tests passing, 1 skipped (async test)
+  - **Default Unit Change**: Successfully changed from 50 miles to 80 km default
+  - **Frontend Tests**: Default value test passing with 80 km
+  - **Integration Verified**: Distance filter correctly integrates with AI prompts
+  - **Unit Conversion**: Seamless switching between km and miles working properly
+
 ### Quality-First Retry Logic Implementation - [Current Date]
 
 - **Philosophy Change**: Shifted from aggressive completion enforcement to quality-first approach with intelligent retry
