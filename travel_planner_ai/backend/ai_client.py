@@ -308,6 +308,9 @@ class AIClient:
                     # Generate different prompts for retry attempts
                     if attempt == 0:
                         # First attempt: Detailed system message focused on quality
+                        exclude_food = trip_request.get('excludeFood', False)
+                        food_instruction = "" if exclude_food else "4. **Mandatory Food Activities**: Include at least 1 dining activity per day (type \"food\")\n"
+                        
                         system_content = f"""You are a travel planning expert. Generate a high-quality itinerary for {expected_days} days.
 
 QUALITY FIRST: Focus on accuracy, detail, and user preference matching over forced completion.
@@ -316,10 +319,10 @@ QUALITY STANDARDS:
 1. **Detailed Descriptions**: 2-3 sentences with specific details, insider tips, historical context
 2. **Precise Preference Matching**: Explain exactly how each activity matches user preferences: {', '.join(trip_request.get('entertainmentPreferences', []))}
 3. **Single Activity Types**: Use ONE type per activity from user preferences, never combine types
-4. **Mandatory Food Activities**: Include at least 1 dining activity per day (type "food")
-5. **Accurate Information**: Specific venue names, addresses, practical details
+{food_instruction}5. **Accurate Information**: Specific venue names, addresses, practical details
 6. **Budget Compliance**: Match {trip_request.get('budgetLevel', 'mid-range')} pricing expectations
 7. **Geographic Logic**: Ensure activities make geographic sense for the trip type
+{"8. **No Food Activities**: User has opted to exclude all food and dining suggestions" if exclude_food else ""}
 
 Generate as many complete days as possible within response limits. Quality over quantity."""
                         prompt = self._generate_prompt(trip_request)
@@ -688,25 +691,32 @@ Why: How this specifically matches preferences and budget
 [ACTIVITY_END]
 [DAY_END]"""
     
-    def _get_quality_requirements(self, preferences_text: str, budget: str, expected_days: int, dates_text: str) -> str:
+    def _get_quality_requirements(self, preferences_text: str, budget: str, expected_days: int, dates_text: str, exclude_food: bool = False) -> str:
         """Get standard quality requirements"""
+        food_requirement = "" if exclude_food else "- MANDATORY: 1+ food activity daily (type \"food\")\n"
+        
         return f"""QUALITY REQUIREMENTS:
 - Target {expected_days} days: {dates_text}
 - 3-5 activities per day with detailed descriptions
-- MANDATORY: 1+ food activity daily (type "food")
-- ALL activities MUST match preferences: {preferences_text}
+{food_requirement}- ALL activities MUST match preferences: {preferences_text}
 - ALL activities MUST fit {budget} budget
 - ALL activities MUST suit traveler composition
 - NO activities that contradict user filters
 - 2-3 sentence descriptions with details, context, insider tips
 - Explain why each specifically matches {preferences_text} preferences"""
     
-    def _get_type_rules(self, preferences_text: str, cuisine_instruction: str) -> str:
+    def _get_type_rules(self, preferences_text: str, cuisine_instruction: str, exclude_food: bool = False) -> str:
         """Get standard type rules"""
+        available_types = f"{preferences_text} OR must-see OR hidden-gems OR family-friendly"
+        if not exclude_food:
+            available_types = f"{preferences_text} OR food OR must-see OR hidden-gems OR family-friendly"
+        
+        food_note = "" if exclude_food else f" {cuisine_instruction}"
+        
         return f"""TYPE RULES:
-- Use ONLY ONE type per activity from: {preferences_text} OR food OR must-see OR hidden-gems OR family-friendly
+- Use ONLY ONE type per activity from: {available_types}
 - NEVER combine types (NO "outdoor, family-friendly" - choose ONE)
-- Prioritize user preferences: {preferences_text}. {cuisine_instruction}"""
+- Prioritize user preferences: {preferences_text}.{food_note}"""
 
     def _generate_prompt(self, args: Dict[str, Any]) -> str:
         """Generate an efficient prompt with all critical logic preserved"""
@@ -728,6 +738,7 @@ Why: How this specifically matches preferences and budget
         traveler_info = self._build_traveler_info(args)
         preferences_context = self._build_preferences_context(args)
         cuisine_instruction = self._build_cuisine_instruction(args)
+        exclude_food = args.get('excludeFood', False)
         
         # Build the main prompt
         prompt = f"""Generate a high-quality {expected_days}-day itinerary for {dates_text}
@@ -738,9 +749,9 @@ Preferences: {preferences_context['preferences_text']}
 {trip_context['geo_context']}
 {preferences_context['local_focus']}
 
-{self._get_quality_requirements(preferences_context['preferences_text'], args.get('budgetLevel', 'mid-range'), expected_days, dates_text)}
+{self._get_quality_requirements(preferences_context['preferences_text'], args.get('budgetLevel', 'mid-range'), expected_days, dates_text, exclude_food)}
 
-{self._get_type_rules(preferences_context['preferences_text'], cuisine_instruction)}
+{self._get_type_rules(preferences_context['preferences_text'], cuisine_instruction, exclude_food)}
 
 {self._get_activity_format_template()}
 
@@ -771,6 +782,7 @@ Focus on quality and accuracy. Generate as many complete days as possible within
         # Build context using helper methods
         preferences_context = self._build_preferences_context(args)
         traveler_info = self._build_traveler_info(args, compact=True)
+        exclude_food = args.get('excludeFood', False)
         
         # Simplified geographic context for retry
         destination = args.get('destination', '').strip()
@@ -803,6 +815,15 @@ Focus on quality and accuracy. Generate as many complete days as possible within
         else:
             continuation_text = f"ERROR: No missing dates found. All {expected_days} days already generated: {', '.join(all_dates)}"
 
+        # Prepare type options safely outside f-string
+        if exclude_food:
+            type_options = f"{preferences_context['preferences_text']} OR must-see OR hidden-gems OR family-friendly"
+        else:
+            type_options = f"{preferences_context['preferences_text']} OR food OR must-see OR hidden-gems OR family-friendly"
+            
+        # Prepare food instruction safely outside f-string
+        food_instruction = "- NO food activities (excluded by user)" if exclude_food else "- Include 1+ food activity daily (type \"food\")"
+
         retry_prompt = f"""{continuation_text}
 
 {geo_context} | {traveler_info} | {args.get('budgetLevel', 'mid-range')}
@@ -814,7 +835,7 @@ CONTINUATION RULES:
 - Do NOT regenerate any existing dates: {', '.join(generated_dates) if generated_dates else 'none generated yet'}
 - Match user preferences: {preferences_context['preferences_text']}
 - Fit budget: {args.get('budgetLevel', 'mid-range')}
-- Include 1+ food activity daily (type "food")
+{food_instruction}
 - 2-3 sentence descriptions with specific details
 - ONE type per activity only
 
@@ -823,7 +844,7 @@ FORMAT (Use exact dates specified above):
 Date: YYYY-MM-DD (from the specific dates list above)
 [ACTIVITY_START]
 Time: HH:MM - HH:MM
-Type: ONE from: {preferences_context['preferences_text']} OR food OR must-see OR hidden-gems OR family-friendly
+Type: ONE from: {type_options}
 Price: free/$/$$/$$$ 
 Location: Specific venue name, City
 Description: 2-3 sentences with details, context, tips
@@ -897,6 +918,9 @@ CRITICAL: Only generate the specific dates requested. Quality over quantity."""
                             'sightseeing': 'must-see',
                             'attraction': 'must-see',
                             'landmark': 'must-see',
+                            'shopping': 'shopping',  # Local markets, boutiques, crafts
+                            'market': 'shopping',
+                            'boutique': 'shopping',
                             'activity': 'outdoor',  # Default fallback
                             'accommodation': 'travel',
                             'travel': 'travel'
@@ -1279,12 +1303,18 @@ CRITICAL: Only generate the specific dates requested. Quality over quantity."""
             logger.warning("[COMBINE] No partial results found to combine")
             return self._create_error_response(trip_request, 'incomplete_response', "No valid days found in AI response")
 
-    def _validate_day_quality(self, day: dict) -> bool:
+    def _validate_day_quality(self, day: dict, exclude_food: bool = False) -> bool:
         """Ensure each day has minimum quality standards"""
         activities = day.get('activities', [])
-        has_food = any(act.get('type') == 'food' for act in activities)
         min_activities = len(activities) >= 3
-        return has_food and min_activities
+        
+        if exclude_food:
+            # When food is excluded, only check for minimum activities
+            return min_activities
+        else:
+            # When food is included, check for both food activities and minimum count
+            has_food = any(act.get('type') == 'food' for act in activities)
+            return has_food and min_activities
 
 __all__ = ['AIClient']
 

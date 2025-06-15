@@ -22,7 +22,7 @@ def sample_trip_request():
         "preferences": {
             "outdoor": True,
             "cultural": False,
-            "relaxation": True,
+            "relax": True,
             "family_friendly": True,
             "food_tours": False
         },

@@ -57,7 +57,7 @@ export interface Stop {
 
 export type TravelType = 'flight' | 'train' | 'road' | 'bus' | 'cruise';
 
-export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relaxation' | 'family-friendly' | 'food' | 'adventure' | 'educational' | 'nightlife' | 'must-see' | 'hidden-gems';
+export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relax' | 'family-friendly' | 'shopping' | 'adventure' | 'nightlife' | 'must-see' | 'hidden-gems';
 
 export type CuisineType = 
   | 'any' 
@@ -97,6 +97,7 @@ export interface TripFormData {
   aiProvider?: AIProvider;
   exclusionRadius?: number;
   exclusionUnit?: 'miles' | 'km';
+  excludeFood?: boolean;
 }
 
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';

@@ -47,7 +47,7 @@ class TestIncompleteItineraryFix:
             'adults': 2,
             'children': 2,
             'budgetLevel': 'mid-range',
-            'entertainmentPreferences': ['outdoor', 'relaxation'],
+            'entertainmentPreferences': ['outdoor', 'relax'],
             'cuisinePreference': 'any',
             'language': 'en'
         }
@@ -158,7 +158,7 @@ class TestIncompleteItineraryFix:
             'adults': 2,
             'children': 2,
             'budgetLevel': 'mid-range',
-            'entertainmentPreferences': ['outdoor', 'relaxation', 'must-see'],
+            'entertainmentPreferences': ['outdoor', 'relax', 'must-see'],
             'cuisinePreference': 'any',
             'language': 'en',
             'aiProvider': 'openai'

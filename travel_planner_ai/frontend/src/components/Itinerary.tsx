@@ -276,13 +276,12 @@ const Itinerary: React.FC<ItineraryProps> = ({
       'hidden-gems':     { bg: '#ffc107', text: '#000' },
       'must-see':        { bg: '#0d6efd', text: '#fff' },
       'family-friendly': { bg: '#198754', text: '#fff' },
-      'food':            { bg: '#fd7e14', text: '#000' },
+      'shopping':        { bg: '#e91e63', text: '#fff' }, // Local markets, boutiques, crafts
       'outdoor':         { bg: '#20c997', text: '#000' },
       'cultural':        { bg: '#6f42c1', text: '#fff' },
       'adventure':       { bg: '#dc3545', text: '#fff' },
-      'educational':     { bg: '#0dcaf0', text: '#000' },
       'nightlife':       { bg: '#343a40', text: '#fff' },
-      'relaxation':      { bg: '#6c757d', text: '#fff' },
+      'relax':      { bg: '#6c757d', text: '#fff' },
       'sightseeing':     { bg: '#cfe2ff', text: '#000' }, // Light blue
       'travel':          { bg: '#adb5bd', text: '#000' },
       'activity':        { bg: '#f8f9fa', text: '#000', border: '1px solid #dee2e6' }, // Default light gray

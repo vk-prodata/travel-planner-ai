@@ -2,6 +2,43 @@
 
 ## Progress Updates
 
+### Entertainment Preferences Adjustment - [January 2025] ✅ COMPLETED
+
+- **🎯 Feature Adjusted**: Updated entertainment preferences to better align with user travel interests
+- **🚀 Changes Implemented**:
+  - **Removed Preferences**: 
+    - "food" - Replaced by dedicated cuisine preference system
+    - "educational" - Overlapped with cultural activities
+  - **Added "Shopping" Preference**: Local markets, boutiques, crafts experiences
+    - Focuses on authentic local markets and artisan shops
+    - Includes boutique shopping and craft experiences
+    - Emphasizes local market culture and unique finds
+
+- **📁 Files Updated**:
+  - `travel_planner_ai/frontend/src/types/index.ts` - Updated EntertainmentPreference type
+  - `travel_planner_ai/frontend/src/types.ts` - Updated EntertainmentPreference type  
+  - `travel_planner_ai/frontend/src/components/TripForm.tsx` - Updated preference buttons array
+  - `travel_planner_ai/frontend/src/components/Itinerary.tsx` - Added shopping color mapping (pink #e91e63)
+  - `travel_planner_ai/backend/ai_client.py` - Added shopping type mappings (shopping, market, boutique)
+
+- **🎯 Technical Implementation**:
+  - **Frontend**: Updated type definitions and UI components
+  - **Backend**: Enhanced type mapping for shopping-related activities
+  - **Styling**: Added distinctive pink color scheme for shopping activities
+  - **Consistency**: Maintained all existing functionality while removing unused preferences
+
+- **✅ Quality Assurance**:
+  - All type definitions updated consistently across frontend files
+  - Backend properly maps shopping variants (shopping, market, boutique)
+  - UI maintains visual consistency with new shopping color theme
+  - No breaking changes to existing functionality
+
+- **🚀 User Experience Benefits**:
+  - **More Focused Options**: Cleaner preference selection without overlapping categories
+  - **Better Shopping Discovery**: Dedicated preference for market and boutique experiences
+  - **Reduced Confusion**: Eliminated food preference overlap with cuisine settings
+  - **Enhanced Local Experiences**: Shopping preference emphasizes authentic local markets
+
 ### Professional External Browser Implementation - [January 2025]
 
 - **🎯 Problem Solved**: Links shared through Telegram, WhatsApp, and other social platforms now open in external browsers instead of in-app browsers, eliminating authentication and functionality issues.
@@ -194,6 +231,67 @@
   - Graceful handling of token limits without quality sacrifice
   - More reliable completion through combination logic
 - **Result**: Expected to achieve both high quality AND completeness through intelligent retry combination
+
+### Exclude Food Suggestions Feature Implementation - [January 2025]
+
+- **🎯 Feature Implemented**: Added optional food exclusion functionality for users who prefer non-food-focused itineraries
+- **🚀 Implementation Features**:
+  - **Optional Checkbox**: Located in Advanced Settings section of TripForm
+  - **Smart Default**: Food suggestions included by default (excludeFood: false)
+  - **User Control**: Clear opt-out mechanism with helpful tooltip explaining benefits
+  - **AI Integration**: Backend logic completely removes food requirements and suggestions when enabled
+  - **Type System**: Full TypeScript support across frontend and backend
+
+- **📁 Frontend Changes**:
+  - `travel_planner_ai/frontend/src/types.ts` - Added `excludeFood?: boolean` to TripFormData interface
+  - `travel_planner_ai/frontend/src/types/index.ts` - Added `excludeFood?: boolean` for consistency
+  - `travel_planner_ai/frontend/src/components/TripForm.tsx` - Added checkbox with tooltip in Advanced Settings
+  - Form state management with default `excludeFood: false`
+  - Informative tooltip explaining feature benefits and default behavior
+
+- **📁 Backend Changes**:
+  - `travel_planner_ai/backend/ai_client.py` - Complete food exclusion logic implementation:
+    - `_get_quality_requirements()` - Conditional food requirement removal
+    - `_get_type_rules()` - Dynamic type list excluding "food" when enabled
+    - `_generate_prompt()` - Integrated exclude_food parameter throughout prompt generation
+    - `_generate_quality_focused_retry_prompt()` - Retry logic respects food exclusion setting
+    - `_validate_day_quality()` - Quality validation adapted for food-free itineraries
+    - System message updates to inform AI about food exclusion when enabled
+
+- **🎯 Technical Implementation**:
+  - **Conditional Logic**: Food requirements only apply when `excludeFood` is false (default)
+  - **Type System Updates**: Available activity types dynamically exclude "food" when disabled
+  - **Prompt Engineering**: Clear AI instructions about food exclusion vs inclusion
+  - **Quality Standards**: Maintains activity count requirements without food dependency
+  - **Edge Case Handling**: excludeFood=True overrides food preferences if somehow both are set
+
+- **✅ Testing & Quality**:
+  - `test_exclude_food_feature.py` - Comprehensive test suite (15KB, 4 main test cases):
+    - Test food exclusion works when enabled (no food activities generated)
+    - Test default behavior includes food activities when disabled
+    - Test edge case: excludeFood=True overrides conflicting food preferences
+    - Test prompt structure correctly excludes food types and requirements
+  - Backend integration tests validate prompt generation and AI client logic
+  - Frontend form submission tests ensure excludeFood parameter passes correctly
+
+- **🚀 User Experience Benefits**:
+  - **Flexible Planning**: Users can focus entirely on non-food activities if preferred
+  - **Time Optimization**: More time allocated to entertainment preferences rather than dining
+  - **Personal Choice**: Accommodates users who prefer to handle dining independently
+  - **Clear Control**: Obvious opt-out mechanism with helpful explanation of feature impact
+
+- **🛠️ AI Integration Details**:
+  - **Quality Requirements**: "MANDATORY: 1+ food activity daily" removed when excludeFood=True
+  - **Type Rules**: Activity types list dynamically excludes "food" option
+  - **System Messages**: AI receives clear instruction about food exclusion policy
+  - **Retry Logic**: Food exclusion consistently maintained across retry attempts
+  - **Validation**: Day quality checks adapted to not require food when excluded
+
+- **📊 Configuration**:
+  - **Default Setting**: `excludeFood: false` (include food suggestions by default)
+  - **UI Location**: Advanced Settings accordion section
+  - **Form Integration**: Seamless integration with existing trip form submission
+  - **Data Flow**: Frontend → Backend → AI prompts → Validation all respect setting
 
 ### Hidden Gems Entertainment Feature Implementation - [Current Date]
 
@@ -1552,7 +1650,7 @@ relevant_keys = [
 - **Added support for:** `getaway`, `escape`, `retreat` travel types
 - **Getaway Mode Features:**
   - Relaxed pacing with 2-4 activities per day (vs standard 3-5)
-  - Focus on relaxation, nature, and escape from urban life
+  - Focus on relax, nature, and escape from urban life
   - Slower pace with emphasis on scenic experiences
   - Quality over quantity approach
 
@@ -1560,7 +1658,7 @@ relevant_keys = [
 - **Auto-detection of nature destinations:** National parks, forests, lakes, mountains, beaches
 - **Specific keywords:** "lassen", "yosemite", "tahoe", "national park", etc.
 - **Enhanced context:** Focus on natural beauty and peaceful atmosphere
-- **Activity prioritization:** Outdoor experiences, scenic spots, relaxation
+- **Activity prioritization:** Outdoor experiences, scenic spots, relax
 
 #### **13. Improved Route Planning for Scenic Trips**
 - **Scenic Route Mode:** When getaway + route-based trip detected

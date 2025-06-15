@@ -3,11 +3,10 @@ export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';
 export type EntertainmentPreference = 
   | 'outdoor' 
   | 'cultural' 
-  | 'relaxation' 
+  | 'relax' 
   | 'family-friendly' 
-  | 'food'
-  | 'adventure'      // For thrill-seeking activities
-  | 'educational'    // For museums, workshops, etc.
+  | 'shopping'      // Local markets, boutiques, crafts
+  | 'adventure'     // For thrill-seeking activities
   | 'nightlife'
   | 'must-see'
   | 'hidden-gems';   // For lesser-known, highly-rated places
@@ -34,6 +33,7 @@ export interface TripFormData {
   language: string;
   exclusionRadius?: number;
   exclusionUnit?: 'miles' | 'km';
+  excludeFood?: boolean;
 }
 
 export interface Activity {

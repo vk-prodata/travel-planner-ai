@@ -29,7 +29,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
     cuisinePreference: 'any',
     aiProvider: 'openai', // Default to OpenAI
     exclusionRadius: 80, // Default 80 km (≈50 miles)
-    exclusionUnit: 'km'
+    exclusionUnit: 'km',
+    excludeFood: false // Default to include food suggestions
   });
 
   const [newStop, setNewStop] = useState<Stop>({ 
@@ -561,6 +562,40 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
             </Form.Group>
             */}
 
+            {/* Exclude Food Suggestions */}
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                id="exclude-food-toggle"
+                label={
+                  <div className="d-flex align-items-center">
+                    Exclude food & dining suggestions
+                    <OverlayTrigger
+                      placement="top"
+                      overlay={
+                        <Tooltip id="exclude-food-tooltip">
+                          <div className="text-start">
+                            <strong>When enabled:</strong>
+                            <div>• No restaurant or café recommendations</div>
+                            <div>• No dining activities in the itinerary</div>
+                            <div>• More time for other preferred activities</div>
+                            <div className="small text-muted mt-1">Default: Include food suggestions</div>
+                          </div>
+                        </Tooltip>
+                      }
+                    >
+                      <span className="ms-2">
+                        <FaInfoCircle className="text-secondary" size={14} />
+                      </span>
+                    </OverlayTrigger>
+                  </div>
+                }
+                checked={formData.excludeFood || false}
+                onChange={(e) => setFormData({...formData, excludeFood: e.target.checked})}
+                className="text-muted"
+              />
+            </Form.Group>
+            
             {/* AI Provider */}
             <Form.Group className="mb-3">
               <Form.Label className="d-flex align-items-center">
@@ -602,11 +637,10 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
           {[
             'outdoor',
             'cultural',
-            'relaxation',
+            'relax',
             'family-friendly',
-            'food',
+            'shopping',
             'adventure',
-            'educational',
             'nightlife',
             'must-see',
             'hidden-gems'
