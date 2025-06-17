@@ -32,6 +32,9 @@ export interface Activity {
   } | string; // Support both object format and string format for backward compatibility
   price?: PriceLevel;
   why?: string;
+  photoTips?: string; // Photography tips for this location
+  bestPhotoTime?: string; // Optimal time for photography
+  viewpoints?: string[]; // Recommended viewpoints/angles
 }
 
 export interface Day {
@@ -57,7 +60,14 @@ export interface Stop {
 
 export type TravelType = 'flight' | 'train' | 'road' | 'bus' | 'cruise';
 
-export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relax' | 'family-friendly' | 'shopping' | 'adventure' | 'nightlife' | 'must-see' | 'hidden-gems';
+export type EntertainmentPreference = 'outdoor' | 'cultural' | 'relax' | 'family-friendly' | 'shopping' | 'adventure' | 'nightlife' | 'must-see' | 'hidden-gems' | 'photoshoot';
+
+export type PhotoshootMode = 'nature' | 'architecture' | 'local' | 'kids' | 'wildlife' | 'insta-blogger';
+
+export interface PhotoshootSettings {
+  mode?: PhotoshootMode;
+  instagramHandle?: string; // Only used when mode is 'insta-blogger'
+}
 
 export type CuisineType = 
   | 'any' 
@@ -98,6 +108,7 @@ export interface TripFormData {
   exclusionRadius?: number;
   exclusionUnit?: 'miles' | 'km';
   excludeFood?: boolean;
+  photoshootSettings?: PhotoshootSettings;
 }
 
 export type BudgetLevel = 'budget' | 'mid-range' | 'luxury';

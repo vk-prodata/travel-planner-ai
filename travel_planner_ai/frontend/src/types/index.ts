@@ -9,7 +9,15 @@ export type EntertainmentPreference =
   | 'adventure'     // For thrill-seeking activities
   | 'nightlife'
   | 'must-see'
-  | 'hidden-gems';   // For lesser-known, highly-rated places
+  | 'hidden-gems'   // For lesser-known, highly-rated places
+  | 'photoshoot';   // For photography-focused activities
+
+export type PhotoshootMode = 'nature' | 'architecture' | 'local' | 'kids' | 'wildlife' | 'insta-blogger';
+
+export interface PhotoshootSettings {
+  mode?: PhotoshootMode;
+  instagramHandle?: string; // Only used when mode is 'insta-blogger'
+}
 
 export interface Stop {
   destination: string;
@@ -34,6 +42,7 @@ export interface TripFormData {
   exclusionRadius?: number;
   exclusionUnit?: 'miles' | 'km';
   excludeFood?: boolean;
+  photoshootSettings?: PhotoshootSettings;
 }
 
 export interface Activity {
@@ -41,6 +50,9 @@ export interface Activity {
   time: string;
   description: string;
   type: string;
+  photoTips?: string; // Photography tips for this location
+  bestPhotoTime?: string; // Optimal time for photography
+  viewpoints?: string[]; // Recommended viewpoints/angles
 }
 
 export interface TripItinerary {

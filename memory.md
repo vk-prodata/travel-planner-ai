@@ -196,6 +196,115 @@
   - **Integration Verified**: Distance filter correctly integrates with AI prompts
   - **Unit Conversion**: Seamless switching between km and miles working properly
 
+### Photoshoot Entertainment Feature Implementation - [January 2025] ✅ COMPLETED
+
+- **🎯 Feature Implemented**: Added comprehensive photoshoot entertainment preference with multiple specialized modes
+- **🚀 Implementation Features**:
+  - **New Entertainment Preference**: Added 'photoshoot' to available entertainment preferences
+  - **6 Specialized Modes**: Nature, Architecture, Local, Kids, Wildlife, and Instagram Blogger modes
+  - **Conditional UI**: Photoshoot settings appear only when photoshoot preference is selected
+  - **Instagram Integration**: Special mode for following specific travel bloggers' styles
+  - **AI-Enhanced**: Detailed photography prompts for optimal timing, viewpoints, and techniques
+
+- **📁 Files Implemented**:
+  - `travel_planner_ai/frontend/src/types.ts` - Added PhotoshootMode, PhotoshootSettings types and Activity enhancements
+  - `travel_planner_ai/frontend/src/types/index.ts` - Synchronized photoshoot types across type definitions
+  - `travel_planner_ai/frontend/src/components/TripForm.tsx` - Added photoshoot mode dropdown and Instagram handle input
+  - `travel_planner_ai/frontend/src/components/Itinerary.tsx` - Added photoshoot activity styling and photo information display
+  - `travel_planner_ai/backend/ai_client.py` - Enhanced AI prompts with photography-specific instructions
+  - `travel_planner_ai/frontend/src/components/__tests__/TripForm.photoshoot.test.tsx` - Comprehensive test suite (15KB, 8 test cases)
+  - `travel_planner_ai/backend/tests/test_photoshoot_ai.py` - Backend AI integration tests (12KB, 13 test cases)
+
+- **🎯 Photoshoot Modes**:
+  - **🌲 Nature Mode**: Landscapes, forests, mountains, waterfalls with golden hour timing
+  - **🏛️ Architecture Mode**: Historic buildings, modern structures, bridges with blue hour suggestions
+  - **📸 Local Mode**: Candid urban moments, local markets, daily life with authentic timing
+  - **👨‍👩‍👧‍👦 Kids Mode**: Family-friendly locations with photogenic backgrounds for natural poses
+  - **🦋 Wildlife Mode**: Natural habitats with ethical wildlife viewing and optimal animal activity times
+  - **📱 Instagram Blogger Mode**: Follow specific influencer styles with default @elenakudry_usa handle
+
+- **🚀 AI Enhancements**:
+  - **Photography Timing**: AI suggests optimal lighting times (golden hour, blue hour, dawn/dusk)
+  - **Viewpoint Guidance**: Specific camera angles and composition suggestions in activity descriptions
+  - **Route Flexibility**: Allows longer distances between activities for better photo opportunities
+  - **Mode-Specific Instructions**: Detailed prompts for each photoshoot mode with specialized guidance
+  - **Instagram Research**: AI attempts to emulate chosen blogger's aesthetic and content style
+
+- **✅ Activity Enhancement**:
+  - **Photo Tips**: New photoTips field for specific photography advice
+  - **Best Photo Time**: bestPhotoTime field for optimal lighting recommendations
+  - **Viewpoints**: viewpoints array for multiple recommended shooting locations
+  - **Visual Indicators**: Orange color scheme (#ff6b35) for photoshoot activities
+  - **Information Display**: Special badges showing photo tips, timing, and viewpoint information
+
+- **🛠️ Technical Implementation**:
+  - **Frontend**: Conditional UI rendering based on photoshoot preference selection
+  - **Backend**: Enhanced prompt building with mode-specific photography instructions
+  - **Integration**: Seamless form submission with photoshoot settings included in trip data
+  - **Type Safety**: Full TypeScript coverage for all new photoshoot-related types
+
+- **✅ Testing & Quality**:
+  - 8 comprehensive frontend tests covering UI behavior, mode selection, form submission
+  - 13 backend tests covering AI context generation, prompt enhancement, Instagram integration
+  - All photoshoot modes tested individually with proper context validation
+  - Form integration tests ensuring data persistence and submission accuracy
+
+- **🚀 User Experience**:
+  - **Smart Visibility**: Photoshoot settings only appear when photoshoot preference is selected
+  - **Mode Descriptions**: Clear emoji-enhanced descriptions for each photoshoot mode
+  - **Instagram Integration**: Pre-filled handle with ability to customize for any travel blogger
+  - **Photography Guidance**: Activities include specific photo tips, timing, and viewpoint suggestions
+  - **Visual Distinction**: Orange-colored badges and special information display for photoshoot activities
+
+- **📊 Photography Features**:
+  - **Lighting Optimization**: Golden hour (sunrise/sunset) and blue hour (twilight) recommendations
+  - **Composition Guidance**: Specific viewpoints and camera angles suggested in activity descriptions
+  - **Route Flexibility**: AI prioritizes photo opportunities over strict geographic constraints
+  - **Ethical Wildlife**: Proper distance and ethical viewing practices for wildlife photography
+  - **Blogger Style Emulation**: Instagram mode attempts to match chosen influencer's aesthetic
+
+- **🎯 AI Prompt Structure**:
+  - **General Photography**: Lighting timing, viewpoint suggestions, route flexibility
+  - **TIMING CONSTRAINT**: Activities can be scheduled ANY time of day but MUST end 1 hour before sunset for adequate light
+  - **Nature Focus**: Early morning mist/dew, midday waterfalls, golden hour landscapes (end 1 hour before sunset)
+  - **Architecture Focus**: Morning clean shadows, afternoon side lighting, late afternoon warm light (end 1 hour before sunset)
+  - **Local Lifestyle**: Morning opening activities, midday bustling life, late afternoon warm lighting (end 1 hour before sunset)
+  - **Family Photography**: Any time during day when kids are energetic, but end 1 hour before sunset for proper lighting
+  - **Wildlife Photography**: Early morning dawn activity, afternoon feeding patterns (end 1 hour before sunset)
+  - **Instagram Style**: Throughout day for different lighting moods, but end 1 hour before sunset for visibility
+
+### Photoshoot Timing Enhancement - [January 2025] ✅ COMPLETED
+
+- **🎯 Feature Enhancement**: Updated photoshoot timing constraints to be more flexible while ensuring adequate lighting
+- **🚀 Key Changes**:
+  - **Flexible Scheduling**: Photoshoot activities can now be scheduled at ANY time of the day
+  - **Safety Constraint**: Activities MUST end at least 1 hour before sunset to ensure adequate lighting
+  - **Mode-Specific Timing**: Each photoshoot mode optimized for different times while respecting sunset constraint
+
+- **📁 Files Updated**:
+  - `travel_planner_ai/backend/ai_client.py` - Enhanced photoshoot context with flexible timing
+  - `travel_planner_ai/backend/tests/test_photoshoot_ai.py` - Updated test assertions to match new timing language
+
+- **🎯 Timing Strategy per Mode**:
+  - **Nature**: Early morning for mist/dew, midday for waterfalls, golden hour for landscapes
+  - **Architecture**: Morning for clean shadows, afternoon for side lighting, late afternoon for warm light
+  - **Local**: Morning for opening activities, midday for bustling life, late afternoon for warm lighting
+  - **Kids**: Any time when children are most energetic, prioritizing natural energy levels
+  - **Wildlife**: Early morning for dawn activity, afternoon for animal feeding patterns
+  - **Instagram**: Throughout day to capture different lighting moods and aesthetic variety
+
+- **✅ Technical Implementation**:
+  - **AI Prompt Enhancement**: Clear instruction that activities can be scheduled flexibly but must respect sunset timing
+  - **Mode-Specific Guidelines**: Each mode includes specific timing recommendations while maintaining sunset constraint
+  - **Test Updates**: All test assertions updated to reflect new flexible timing language
+  - **Backward Compatibility**: Changes enhance existing functionality without breaking current behavior
+
+- **🚀 User Benefits**:
+  - **Greater Flexibility**: More scheduling options throughout the day for photoshoot activities
+  - **Lighting Safety**: Ensures adequate light for photography while allowing maximum scheduling freedom
+  - **Mode Optimization**: Each photoshoot mode optimized for its specific photography requirements
+  - **Natural Scheduling**: Activities can follow natural patterns (kid energy, animal behavior, local rhythms)
+
 ### Quality-First Retry Logic Implementation - [Current Date]
 
 - **Philosophy Change**: Shifted from aggressive completion enforcement to quality-first approach with intelligent retry
@@ -1805,3 +1914,84 @@ if (browserInfo.isEmbedded || browserInfo.isTelegram) {
 - Test edge cases with different mobile browsers
 - Consider additional social platform integrations
 - Optimize performance and loading speeds
+
+## 2024-12-29: Entertainment Preference Prompt System Overhaul
+
+### 🦊 Analysis of Existing State
+**PROBLEMS IDENTIFIED:**
+- Only `hidden-gems` and `photoshoot` had specialized prompt logic
+- 8 other preferences (`outdoor`, `cultural`, `family-friendly`, `shopping`, `adventure`, `nightlife`, `must-see`, `relax`) had no specialized logic
+- DRY violations: prompt logic scattered across multiple methods
+- Hardcoded preference handling in `_build_preferences_context` and `refresh_activity_suggestion`
+
+### 🎯 Solution: Comprehensive Entertainment Preference System
+
+**NEW ARCHITECTURE:**
+1. **`_build_entertainment_preference_prompts()`** - Central function handling ALL preference logic
+2. **Structured Preference Data** - Each preference has:
+   - Activity focus description
+   - Selection criteria guidelines  
+   - Timing constraints
+   - Special instructions (when needed)
+
+**PREFERENCES COVERED (10 total):**
+1. **outdoor** - Nature-based activities, weather-dependent scheduling
+2. **cultural** - Museums, historic sites, educational value focus
+3. **family-friendly** - Safety, age-appropriate, child engagement
+4. **shopping** - Local markets, artisan workshops, authentic products
+5. **adventure** - Thrilling experiences, physical challenges
+6. **nightlife** - Evening entertainment, local atmosphere
+7. **must-see** - Iconic landmarks, universal recognition
+8. **relax** - Peaceful experiences, stress reduction
+9. **hidden-gems** - Local secrets, authentic experiences (enhanced)
+10. **photoshoot** - Visual appeal, lighting optimization (enhanced)
+
+### 🔧 Implementation Details
+
+**KEY METHODS UPDATED:**
+- `_build_entertainment_preference_prompts()` - NEW comprehensive system
+- `_build_photoshoot_context()` - Extracted for maintainability  
+- `_build_preferences_context()` - Updated to use new system
+- `_generate_prompt()` - Uses `comprehensive_context` instead of scattered logic
+- `refresh_activity_suggestion()` - Uses centralized preference system
+
+**SPECIAL LOGIC HANDLING:**
+- **Family-friendly** - Adds traveler composition awareness
+- **Hidden-gems** - Maintains existing LOCAL focus instructions
+- **Photoshoot** - All 6 modes supported (nature, architecture, local, kids, wildlife, insta-blogger)
+
+### 📊 Results & Validation
+
+**TESTING:**
+- 14 comprehensive tests created in `test_entertainment_preferences.py`
+- All tests pass ✅
+- Demo script shows system working correctly
+
+**DRY COMPLIANCE:**
+- Single source of truth for all preference logic
+- No code duplication across methods
+- Maintainable and extensible architecture
+
+**BENEFITS:**
+- Enhanced AI prompt quality for ALL preferences
+- Consistent prompt structure across preferences
+- Easy to add new preferences or modify existing ones
+- Better user experience with more targeted recommendations
+
+### 🚀 Impact on AI Quality
+
+**BEFORE:** Only 2 preferences had specialized logic (20% coverage)
+**AFTER:** All 10 preferences have comprehensive logic (100% coverage)
+
+Each preference now provides:
+- Specific activity recommendations
+- Selection criteria for AI decision-making
+- Timing considerations for optimal scheduling
+- Special instructions when needed
+
+This should significantly improve the quality and relevance of AI-generated itineraries for all user preference combinations.
+
+### 🔗 Files Modified
+- `travel_planner_ai/backend/ai_client.py` - Core implementation
+- `travel_planner_ai/backend/tests/test_entertainment_preferences.py` - Comprehensive tests
+- `travel_planner_ai/backend/demo_preference_prompts.py` - Demo script

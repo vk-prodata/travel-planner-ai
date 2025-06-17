@@ -282,6 +282,7 @@ const Itinerary: React.FC<ItineraryProps> = ({
       'adventure':       { bg: '#dc3545', text: '#fff' },
       'nightlife':       { bg: '#343a40', text: '#fff' },
       'relax':      { bg: '#6c757d', text: '#fff' },
+      'photoshoot':      { bg: '#ff6b35', text: '#fff' }, // Orange for photography
       'sightseeing':     { bg: '#cfe2ff', text: '#000' }, // Light blue
       'travel':          { bg: '#adb5bd', text: '#000' },
       'activity':        { bg: '#f8f9fa', text: '#000', border: '1px solid #dee2e6' }, // Default light gray
@@ -476,6 +477,30 @@ const Itinerary: React.FC<ItineraryProps> = ({
                                   >
                                     View on Map
                                   </a>
+                                </div>
+                              )}
+                              
+                              {/* Photoshoot-specific information */}
+                              {activity.type === 'photoshoot' && (
+                                <div className="photoshoot-info mt-2">
+                                  {activity.photoTips && (
+                                    <div className="photo-tips mb-2">
+                                      <span className="badge bg-warning text-dark me-2">📸 Photo Tips</span>
+                                      <span className="text-muted">{activity.photoTips}</span>
+                                    </div>
+                                  )}
+                                  {activity.bestPhotoTime && (
+                                    <div className="best-photo-time mb-2">
+                                      <span className="badge bg-info me-2">⏰ Best Time</span>
+                                      <span className="text-muted">{activity.bestPhotoTime}</span>
+                                    </div>
+                                  )}
+                                  {activity.viewpoints && activity.viewpoints.length > 0 && (
+                                    <div className="viewpoints">
+                                      <span className="badge bg-success me-2">📍 Viewpoints</span>
+                                      <span className="text-muted">{activity.viewpoints.join(', ')}</span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               

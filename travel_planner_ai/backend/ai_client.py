@@ -640,25 +640,317 @@ Generate complete, accurate days for the missing dates only."""
             traveler_info += f"{separator}{args.get('infants', 0)} infants"
         return traveler_info
     
-    def _build_preferences_context(self, args: Dict[str, Any]) -> Dict[str, str]:
-        """Build preferences and local focus context"""
-        preferences = args.get('entertainmentPreferences', [])
-        preferences_text = ', '.join(preferences) if preferences else 'general'
+    def _build_entertainment_preference_prompts(self, preferences: list, args: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Build comprehensive prompt logic for each entertainment preference.
+        This centralizes all preference-specific AI instructions following DRY principles.
         
-        # Hidden gems focus
-        local_focus = ""
+        Returns:
+            Dict with preference-specific prompt contexts
+        """
+        preference_contexts = {
+            'activities_focus': [],
+            'timing_constraints': [],
+            'selection_criteria': [],
+            'special_instructions': []
+        }
+        
+        # Define comprehensive preference logic
+        preference_prompts = {
+            'outdoor': {
+                'focus': 'OUTDOOR ADVENTURES: Prioritize nature-based activities and fresh air experiences',
+                'activities': [
+                    'Hiking trails with scenic viewpoints and difficulty-appropriate paths',
+                    'Parks and gardens for walking, picnicking, and nature appreciation',
+                    'Outdoor markets and waterfront areas for fresh air experiences',
+                    'Scenic overlooks, viewpoints, and outdoor observation areas',
+                    'Beach activities, lakeside spots, and waterfront promenades'
+                ],
+                'criteria': 'Weather-dependent activities with outdoor settings and natural environments',
+                'timing': 'Schedule outdoor activities during optimal weather windows and daylight hours'
+            },
+            
+            'cultural': {
+                'focus': 'CULTURAL IMMERSION: Emphasize authentic local culture, history, and traditions',
+                'activities': [
+                    'Museums with significant historical or cultural collections',
+                    'Historic sites, monuments, and architectural landmarks',
+                    'Art galleries featuring local and international artists',
+                    'Cultural centers, theaters, and performance venues',
+                    'Traditional festivals, ceremonies, and cultural events if available'
+                ],
+                'criteria': 'Educational value, historical significance, and authentic cultural representation',
+                'timing': 'Consider museum hours, cultural event schedules, and guided tour availability'
+            },
+            
+            'family-friendly': {
+                'focus': 'FAMILY EXPERIENCES: Safe, engaging activities suitable for all family members',
+                'activities': [
+                    'Interactive museums and hands-on learning experiences',
+                    'Playgrounds, parks, and child-safe recreational areas',
+                    'Family-oriented entertainment venues and activity centers',
+                    'Zoos, aquariums, and wildlife experiences with educational components',
+                    'Kid-friendly restaurants with varied menu options and play areas'
+                ],
+                'criteria': 'Safety, age-appropriateness, educational value, and engagement for children',
+                'timing': 'Schedule around nap times, meal schedules, and child energy levels'
+            },
+            
+            'shopping': {
+                'focus': 'SHOPPING & MARKETS: Local crafts, unique finds, and authentic market experiences',
+                'activities': [
+                    'Local markets featuring regional crafts, foods, and handmade items',
+                    'Artisan workshops and studios where visitors can observe or participate',
+                    'Boutique stores and local retailers with unique, region-specific products',
+                    'Vintage and antique shops with historical or cultural significance',
+                    'Specialty food markets and gourmet shops for local delicacies'
+                ],
+                'criteria': 'Authenticity, local ownership, unique products, and cultural value',
+                'timing': 'Market operating hours, artisan workshop schedules, and peak shopping times'
+            },
+            
+            'adventure': {
+                'focus': 'ADVENTURE SEEKING: Thrilling, active experiences with physical challenges',
+                'activities': [
+                    'Adventure sports facilities and guided extreme sport experiences',
+                    'Challenging hiking trails, rock climbing, or water sports',
+                    'Zip-lining, bungee jumping, or aerial adventure courses',
+                    'Bike rentals for mountain biking or challenging cycling routes',
+                    'Adventure tours with physical activity components and skill-building'
+                ],
+                'criteria': 'Physical challenge level, safety standards, and adrenaline factor',
+                'timing': 'Weather conditions, physical energy levels, and safety requirements'
+            },
+            
+            'nightlife': {
+                'focus': 'EVENING ENTERTAINMENT: After-dark activities and social experiences',
+                'activities': [
+                    'Local bars, pubs, and lounges with regional character and atmosphere',
+                    'Live music venues featuring local artists and traditional music',
+                    'Dance clubs and entertainment venues popular with locals',
+                    'Evening walking tours and nighttime city exploration',
+                    'Late-night dining experiences and evening food markets'
+                ],
+                'criteria': 'Local atmosphere, safety, authentic nightlife culture, and age-appropriateness',
+                'timing': 'Evening and night hours, with consideration for local nightlife schedules'
+            },
+            
+            'must-see': {
+                'focus': 'ICONIC ATTRACTIONS: Essential landmarks and universally recommended experiences',
+                'activities': [
+                    'World-famous landmarks and UNESCO World Heritage sites',
+                    'Iconic viewpoints and signature attractions of the destination',
+                    'Highly-rated tourist attractions with exceptional reviews',
+                    'Architectural marvels and engineering achievements',
+                    'Natural wonders and geographical highlights of the region'
+                ],
+                'criteria': 'Universal recognition, exceptional ratings, and destination significance',
+                'timing': 'Peak visiting hours, crowd management, and optimal viewing conditions'
+            },
+            
+            'relax': {
+                'focus': 'RELAXATION & WELLNESS: Peaceful, rejuvenating, and stress-free experiences',
+                'activities': [
+                    'Spas, wellness centers, and massage therapy locations',
+                    'Peaceful gardens, meditation spaces, and quiet natural areas',
+                    'Gentle walking paths, leisurely strolls, and low-energy activities',
+                    'Cafes and tea houses with tranquil atmospheres for quiet time',
+                    'Scenic spots perfect for reading, reflection, or simply unwinding'
+                ],
+                'criteria': 'Peaceful atmosphere, minimal crowds, comfort, and stress reduction',
+                'timing': 'Quieter hours, avoiding peak times, and scheduling adequate time for relaxation'
+            },
+            
+            'hidden-gems': {
+                'focus': 'LOCAL SECRETS: Authentic experiences where locals go, away from tourist crowds',
+                'activities': [
+                    'Family-run restaurants and local neighborhood eateries',
+                    'Local markets, community centers, and neighborhood gathering spots',
+                    'Artisan workshops, local studios, and small-scale cultural venues',
+                    'Off-the-beaten-path natural areas and lesser-known scenic spots',
+                    'Local festivals, community events, and neighborhood celebrations'
+                ],
+                'criteria': 'Local ownership, authentic atmosphere, high local ratings, low tourist traffic',
+                'timing': 'Local peak hours when residents frequent these places for authentic experience'
+            },
+            
+            'photoshoot': {
+                'focus': 'PHOTOGRAPHY OPPORTUNITIES: Exceptional visual appeal and Instagram-worthy moments',
+                'activities': [
+                    'Scenic viewpoints with dramatic backgrounds and optimal lighting',
+                    'Architecturally significant buildings with unique visual appeal',
+                    'Colorful markets, street art, and visually striking urban scenes',
+                    'Natural settings with beautiful landscapes and photo opportunities',
+                    'Cultural sites with photogenic elements and historical significance'
+                ],
+                'criteria': 'Visual appeal, lighting conditions, background quality, and photo composition potential',
+                'timing': 'Golden hour lighting, avoiding harsh midday sun, ending 1 hour before sunset'
+            }
+        }
+        
+        # Process each selected preference
+        for preference in preferences:
+            if preference in preference_prompts:
+                prompt_data = preference_prompts[preference]
+                
+                # Add focus statement
+                preference_contexts['activities_focus'].append(prompt_data['focus'])
+                
+                # Add selection criteria
+                preference_contexts['selection_criteria'].append(
+                    f"{preference.upper()}: {prompt_data['criteria']}"
+                )
+                
+                # Add timing constraints
+                if prompt_data.get('timing'):
+                    preference_contexts['timing_constraints'].append(
+                        f"{preference.upper()}: {prompt_data['timing']}"
+                    )
+        
+        # Handle special cases with additional logic
+        special_instructions = []
+        
+        # Hidden gems special logic
         if 'hidden-gems' in preferences:
-            local_focus = """HIDDEN GEMS - LOCAL FOCUS: Prioritize authentic LOCAL experiences:
+            special_instructions.append("""
+HIDDEN GEMS - LOCAL FOCUS: Prioritize authentic LOCAL experiences:
 - LOCAL favorites: family-run businesses, neighborhood spots popular for locals
 - Places where LOCALS go - not tourist traps or chain establishments  
 - LOCAL markets, festivals, community centers, family restaurants
-- LOCAL-owned shops, artisan workshops, cultural venues"""
+- LOCAL-owned shops, artisan workshops, cultural venues""")
+        
+        # Photoshoot special logic with modes
+        if 'photoshoot' in preferences:
+            photoshoot_settings = args.get('photoshootSettings', {})
+            if photoshoot_settings:
+                special_instructions.append(self._build_photoshoot_context(photoshoot_settings))
+        
+        # Family-friendly special considerations
+        if 'family-friendly' in preferences:
+            traveler_info = self._build_traveler_info(args)
+            if args.get('children', 0) > 0 or args.get('infants', 0) > 0:
+                special_instructions.append(f"""
+FAMILY-FRIENDLY PRIORITY: All activities must accommodate {traveler_info}:
+- Child safety considerations and age-appropriate content
+- Stroller accessibility and family restroom facilities
+- Shorter activity durations to match children's attention spans
+- Educational value and interactive elements to keep children engaged""")
+        
+        preference_contexts['special_instructions'] = special_instructions
+        
+        return preference_contexts
+
+    def _build_photoshoot_context(self, photoshoot_settings: Dict[str, Any]) -> str:
+        """Extract photoshoot context logic to separate method for maintainability"""
+        mode = photoshoot_settings.get('mode')
+        insta_handle = photoshoot_settings.get('instagramHandle')
+        
+        base_context = """
+PHOTOSHOOT MODE ACTIVATED - PHOTOGRAPHY FOCUS:
+- Prioritize locations with exceptional photography opportunities
+- TIMING CONSTRAINT: Photoshoot activities can be scheduled at ANY time of the day but MUST end at least 1 hour before sunset to ensure adequate light
+- Consider optimal lighting times (golden hour: sunrise/sunset, blue hour: twilight) and suggest activity timing based on best photography conditions
+- Schedule activities throughout the day (morning, afternoon, late afternoon) but ensure they finish before the last hour of daylight
+- Suggest specific viewpoints and camera angles in 'Why' field
+- Allow longer distances between activities if it provides better photo opportunities, but focus on route/destination.
+- Include best photography timing recommendations in activity descriptions"""
+        
+        if mode == 'nature':
+            return base_context + """
+NATURE PHOTOGRAPHY FOCUS:
+- Landscapes with dramatic lighting and composition
+- Forests with interesting textures, patterns, and dappled light
+- Mountains with panoramic views and layered scenery
+- Waterfalls with long exposure opportunities
+- Best times: early morning for mist/dew, midday for waterfalls, golden hour for landscapes (but end 1 hour before sunset)
+- Can be scheduled any time during daylight hours with timing optimized for specific natural features"""
             
+        elif mode == 'architecture':
+            return base_context + """
+ARCHITECTURE PHOTOGRAPHY FOCUS:
+- Historic buildings with unique architectural details and character
+- Modern structures with interesting geometry and lines
+- Bridges from multiple angles showcasing engineering beauty
+- Urban landscapes with compelling compositions
+- Best times: morning for clean shadows, afternoon for side lighting, late afternoon for warm light (end 1 hour before sunset)
+- Can be scheduled throughout the day with different lighting approaches for various architectural styles"""
+            
+        elif mode == 'local':
+            return base_context + """
+LOCAL LIFESTYLE PHOTOGRAPHY FOCUS:
+- Candid street photography opportunities with authentic moments
+- Local markets with vibrant colors, textures, and activity
+- Daily life scenes showing authentic culture and traditions
+- People engaging in traditional activities (with respect for privacy)
+- Best times: morning for opening activities, midday for bustling life, late afternoon for warm lighting (end 1 hour before sunset)
+- Can capture different aspects of local life throughout the day while respecting sunset timing constraint"""
+            
+        elif mode == 'kids':
+            return base_context + """
+FAMILY PHOTOGRAPHY FOCUS:
+- Kid-friendly locations with photogenic and colorful backgrounds
+- Interactive activities that create natural poses and genuine expressions
+- Safe environments where children can play and explore naturally
+- Playgrounds, parks, interactive museums with engaging backdrops
+- Family photo opportunities with beautiful natural or architectural settings
+- Can be scheduled any time during the day when kids are most energetic, but end 1 hour before sunset for proper lighting"""
+            
+        elif mode == 'wildlife':
+            return base_context + """
+WILDLIFE PHOTOGRAPHY FOCUS:
+- Natural habitats with wildlife viewing and photography opportunities
+- Best times for animal activity (early morning for dawn activity, afternoon for feeding, but end 1 hour before sunset)
+- Ethical wildlife viewing locations with proper distance for safety
+- Photography hides, observation platforms, or guided wildlife tours
+- National parks, reserves, and sanctuaries with photography programs
+- Schedule based on animal activity patterns throughout the day while respecting sunset timing constraint"""
+            
+        elif mode == 'insta-blogger' and insta_handle:
+            return base_context + f"""
+INSTAGRAM BLOGGER STYLE - Following {insta_handle}:
+- MUST: Explane why this specific location is a good fit for the blogger's style. Refer to the profile and the photos.
+- Research and emulate the aesthetic and style of {insta_handle}
+- Suggest locations that match their typical content style and themes
+- Focus on Instagram-worthy spots with high visual impact
+- Consider locations similar to ones this blogger has featured (if research indicates)
+- Prioritize highly photogenic and 'grammable' experiences
+- Can be scheduled throughout the day to capture different lighting moods, but end 1 hour before sunset for proper visibility"""
+        
+        return base_context
+
+    def _build_preferences_context(self, args: Dict[str, Any]) -> Dict[str, str]:
+        """Build preferences and local focus context using the new comprehensive system"""
+        preferences = args.get('entertainmentPreferences', [])
+        preferences_text = ', '.join(preferences) if preferences else 'general'
+        
+        # Use the new comprehensive preference system
+        preference_contexts = self._build_entertainment_preference_prompts(preferences, args)
+        
+        # Build consolidated contexts
+        activities_focus = '\n'.join(preference_contexts['activities_focus']) if preference_contexts['activities_focus'] else ""
+        
+        selection_criteria = '\n'.join(preference_contexts['selection_criteria']) if preference_contexts['selection_criteria'] else ""
+        
+        timing_constraints = '\n'.join(preference_contexts['timing_constraints']) if preference_contexts['timing_constraints'] else ""
+        
+        special_instructions = '\n'.join(preference_contexts['special_instructions']) if preference_contexts['special_instructions'] else ""
+        
+        # Combine all contexts
+        comprehensive_context = ""
+        if activities_focus:
+            comprehensive_context += f"\nACTIVITY FOCUS:\n{activities_focus}\n"
+        if selection_criteria:
+            comprehensive_context += f"\nSELECTION CRITERIA:\n{selection_criteria}\n"
+        if timing_constraints:
+            comprehensive_context += f"\nTIMING CONSIDERATIONS:\n{timing_constraints}\n"
+        
         return {
             'preferences_text': preferences_text,
-            'local_focus': local_focus
+            'local_focus': special_instructions,  # Keep for backward compatibility
+            'photoshoot_context': "",  # Handled in special_instructions now
+            'comprehensive_context': comprehensive_context.strip()
         }
-    
+
     def _build_cuisine_instruction(self, args: Dict[str, Any]) -> str:
         """Build cuisine preference instruction"""
         cuisine_preference = args.get('cuisinePreference', 'any')
@@ -715,7 +1007,7 @@ Why: How this specifically matches preferences and budget
         
         return f"""TYPE RULES:
 - Use ONLY ONE type per activity from: {available_types}
-- NEVER combine types (NO "outdoor, family-friendly" - choose ONE)
+
 - Prioritize user preferences: {preferences_text}.{food_note}"""
 
     def _generate_prompt(self, args: Dict[str, Any]) -> str:
@@ -747,6 +1039,7 @@ Trip: {trip_context['travel_mode']}{trip_context['intermediate_stops_text']}
 {traveler_info} | Budget: {args.get('budgetLevel', 'mid-range')}
 Preferences: {preferences_context['preferences_text']}
 {trip_context['geo_context']}
+{preferences_context['comprehensive_context']}
 {preferences_context['local_focus']}
 
 {self._get_quality_requirements(preferences_context['preferences_text'], args.get('budgetLevel', 'mid-range'), expected_days, dates_text, exclude_food)}
@@ -1144,22 +1437,24 @@ CRITICAL: Only generate the specific dates requested. Quality over quantity."""
             User's custom preferences: {custom_preferences}
             '''
             
-            if 'hidden-gems' in custom_preferences.lower():
-                prompt += '''
-            HIDDEN GEMS FOCUS: Generate lesser-known, authentic local experiences:
-            - Avoid mainstream tourist spots
-            - Focus on local favorites with high ratings but low tourist traffic
-            - Include authentic neighborhood gems and family-run establishments
-            '''
+            # Apply preference-specific logic using the centralized system
+            if custom_preferences:
+                # Parse preferences from custom_preferences string
+                parsed_preferences = [pref.strip().lower() for pref in custom_preferences.lower().split(',')]
+                preference_contexts = self._build_entertainment_preference_prompts(parsed_preferences, {})
+                
+                if preference_contexts['special_instructions']:
+                    prompt += f"\n\nSPECIAL INSTRUCTIONS:\n{chr(10).join(preference_contexts['special_instructions'])}"
+                
+                if preference_contexts['selection_criteria']:
+                    prompt += f"\n\nSELECTION CRITERIA:\n{chr(10).join(preference_contexts['selection_criteria'])}"
             
             if is_meal:
                 prompt += '''
             For meal activities, provide 2-3 specific restaurant options with brief descriptions
             Format the description exactly like this: 
             "Options include: 
-            1. Restaurant Name - Brief description of cuisine and ambiance. 
-            2. Restaurant Name - Brief description. 
-            3. Restaurant Name - Brief description."
+            - Restaurant Name - Brief description of cuisine and ambiance."
             
             IMPORTANT: Make sure each numbered restaurant option is on its own line, and use proper spacing.
             Do NOT split restaurant names across multiple lines.

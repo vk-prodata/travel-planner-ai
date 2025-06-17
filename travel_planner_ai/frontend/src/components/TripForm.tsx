@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Button, Row, Col, OverlayTrigger, Tooltip, Accordion, Badge } from 'react-bootstrap';
 import { FaInfoCircle, FaPlus } from 'react-icons/fa';
-import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType, AIProvider } from '../types';
+import { TripFormData, TravelType, EntertainmentPreference, Stop, BudgetLevel, CuisineType, AIProvider, PhotoshootSettings, PhotoshootMode } from '../types';
 import LocationInput from './LocationInput';
 import DistanceFilter from './DistanceFilter';
 
@@ -30,7 +30,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
     aiProvider: 'openai', // Default to OpenAI
     exclusionRadius: 80, // Default 80 km (≈50 miles)
     exclusionUnit: 'km',
-    excludeFood: false // Default to include food suggestions
+    excludeFood: false, // Default to include food suggestions
+    photoshootSettings: {}
   });
 
   const [newStop, setNewStop] = useState<Stop>({ 
@@ -643,7 +644,8 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
             'adventure',
             'nightlife',
             'must-see',
-            'hidden-gems'
+            'hidden-gems',
+            'photoshoot'
           ].map((pref) => (
             <Button
               key={pref}
@@ -662,6 +664,69 @@ const TripForm: React.FC<TripFormProps> = ({ onSubmit, isLoading, user }) => {
           ))}
         </div>
       </Form.Group>
+
+      {/* Photoshoot Settings - Show when photoshoot is selected */}
+      {(formData.entertainmentPreferences || []).includes('photoshoot') && (
+        <Form.Group className="mb-3">
+          <Form.Label className="d-flex align-items-center">
+            📸 Photoshoot Mode
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip id="photoshoot-tooltip">
+                  Choose your photography focus for this trip. AI will optimize locations and timing for the best photo opportunities.
+                </Tooltip>
+              }
+            >
+              <span className="ms-2">
+                <FaInfoCircle className="text-secondary" size={14} />
+              </span>
+            </OverlayTrigger>
+          </Form.Label>
+          <Form.Select
+            value={formData.photoshootSettings?.mode || ''}
+            onChange={(e) => setFormData({
+              ...formData,
+              photoshootSettings: {
+                ...formData.photoshootSettings,
+                mode: e.target.value as PhotoshootMode
+              }
+            })}
+            className="shadow-sm"
+          >
+            <option value="">Select a photoshoot focus...</option>
+            <option value="nature">🌲 Nature Mode - Landscapes, forests, mountains, waterfalls</option>
+            <option value="architecture">🏛️ Architecture Mode - Historic buildings, modern structures, bridges</option>
+            <option value="local">📸 Local Mode - Candid urban moments, local markets, daily life</option>
+            <option value="kids">👨‍👩‍👧‍👦 Fun with Kids - Family-friendly activities with beautiful photoshoots</option>
+            <option value="wildlife">🦋 Wildlife Mode - Animals in natural habitat</option>
+            <option value="insta-blogger">📱 Follow Insta Blogger - Travel in the style of an influencer</option>
+          </Form.Select>
+          
+          {/* Instagram Handle Input - Show when insta-blogger mode is selected */}
+          {formData.photoshootSettings?.mode === 'insta-blogger' && (
+            <div className="mt-2">
+              <Form.Label>Instagram Handle</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="@username"
+                value={formData.photoshootSettings?.instagramHandle || '@elenakudry_usa'}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  photoshootSettings: {
+                    ...formData.photoshootSettings,
+                    instagramHandle: e.target.value
+                  }
+                })}
+                className="shadow-sm"
+              />
+              <Form.Text className="text-muted">
+                AI will suggest activities in the style of this travel blogger and find places they've featured
+              </Form.Text>
+            </div>
+          )}
+        </Form.Group>
+      )}
 
       <Button 
         type="submit" 
